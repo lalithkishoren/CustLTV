@@ -1,0 +1,237 @@
+{
+    "name": "PL_Gold_Orchestrator",
+    "properties": {
+        "activities": [
+            {
+                "name": "Lookup_ActiveGoldTables",
+                "type": "Lookup",
+                "dependsOn": [],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "source": {
+                        "type": "AzureSqlSource",
+                        "sqlReaderQuery": "SELECT * FROM control.gold_table_config WHERE is_active = 1 ORDER BY CASE WHEN table_type = 'DIMENSION' THEN 1 WHEN table_type = 'FACT' THEN 2 WHEN table_type = 'AGGREGATE' THEN 3 ELSE 4 END",
+                        "queryTimeout": "02:00:00",
+                        "partitionOption": "None"
+                    },
+                    "dataset": {
+                        "referenceName": "DS_ControlDB_Gold",
+                        "type": "DatasetReference"
+                    },
+                    "firstRowOnly": false
+                }
+            },
+            {
+                "name": "ForEach_Dimensions",
+                "type": "ForEach",
+                "dependsOn": [
+                    {
+                        "activity": "Lookup_ActiveGoldTables",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                    "items": {
+                        "value": "@activity('Lookup_ActiveGoldTables').output.value",
+                        "type": "Expression"
+                    },
+                    "isSequential": false,
+                    "activities": [
+                        {
+                            "name": "If_Dimension",
+                            "type": "IfCondition",
+                            "dependsOn": [],
+                            "userProperties": [],
+                            "typeProperties": {
+                                "expression": {
+                                    "value": "@equals(item().table_type, 'DIMENSION')",
+                                    "type": "Expression"
+                                },
+                                "ifTrueActivities": [
+                                    {
+                                        "name": "Execute_Build_Dimension",
+                                        "type": "ExecutePipeline",
+                                        "dependsOn": [],
+                                        "userProperties": [],
+                                        "typeProperties": {
+                                            "pipeline": {
+                                                "referenceName": "PL_Gold_Build_Dimension",
+                                                "type": "PipelineReference"
+                                            },
+                                            "waitOnCompletion": true,
+                                            "parameters": {
+                                                "pipeline_run_id": {
+                                                    "value": "@pipeline().parameters.pipeline_run_id",
+                                                    "type": "Expression"
+                                                },
+                                                "gold_table_id": {
+                                                    "value": "@item().gold_table_id",
+                                                    "type": "Expression"
+                                                },
+                                                "source_silver_tables": {
+                                                    "value": "@item().source_silver_tables",
+                                                    "type": "Expression"
+                                                },
+                                                "target_gold_table": {
+                                                    "value": "@item().target_gold_table",
+                                                    "type": "Expression"
+                                                }
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            },
+            {
+                "name": "ForEach_Facts",
+                "type": "ForEach",
+                "dependsOn": [
+                    {
+                        "activity": "ForEach_Dimensions",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                    "items": {
+                        "value": "@activity('Lookup_ActiveGoldTables').output.value",
+                        "type": "Expression"
+                    },
+                    "isSequential": true,
+                    "activities": [
+                        {
+                            "name": "If_Fact",
+                            "type": "IfCondition",
+                            "dependsOn": [],
+                            "userProperties": [],
+                            "typeProperties": {
+                                "expression": {
+                                    "value": "@equals(item().table_type, 'FACT')",
+                                    "type": "Expression"
+                                },
+                                "ifTrueActivities": [
+                                    {
+                                        "name": "Execute_Build_Fact",
+                                        "type": "ExecutePipeline",
+                                        "dependsOn": [],
+                                        "userProperties": [],
+                                        "typeProperties": {
+                                            "pipeline": {
+                                                "referenceName": "PL_Gold_Build_Fact",
+                                                "type": "PipelineReference"
+                                            },
+                                            "waitOnCompletion": true,
+                                            "parameters": {
+                                                "pipeline_run_id": {
+                                                    "value": "@pipeline().parameters.pipeline_run_id",
+                                                    "type": "Expression"
+                                                },
+                                                "gold_table_id": {
+                                                    "value": "@item().gold_table_id",
+                                                    "type": "Expression"
+                                                },
+                                                "source_silver_tables": {
+                                                    "value": "@item().source_silver_tables",
+                                                    "type": "Expression"
+                                                },
+                                                "target_gold_table": {
+                                                    "value": "@item().target_gold_table",
+                                                    "type": "Expression"
+                                                }
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            },
+            {
+                "name": "ForEach_Aggregates",
+                "type": "ForEach",
+                "dependsOn": [
+                    {
+                        "activity": "ForEach_Facts",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                    "items": {
+                        "value": "@activity('Lookup_ActiveGoldTables').output.value",
+                        "type": "Expression"
+                    },
+                    "isSequential": false,
+                    "activities": [
+                        {
+                            "name": "If_Aggregate",
+                            "type": "IfCondition",
+                            "dependsOn": [],
+                            "userProperties": [],
+                            "typeProperties": {
+                                "expression": {
+                                    "value": "@equals(item().table_type, 'AGGREGATE')",
+                                    "type": "Expression"
+                                },
+                                "ifTrueActivities": [
+                                    {
+                                        "name": "Execute_Build_Aggregate",
+                                        "type": "ExecutePipeline",
+                                        "dependsOn": [],
+                                        "userProperties": [],
+                                        "typeProperties": {
+                                            "pipeline": {
+                                                "referenceName": "PL_Gold_Build_Aggregate",
+                                                "type": "PipelineReference"
+                                            },
+                                            "waitOnCompletion": true,
+                                            "parameters": {
+                                                "pipeline_run_id": {
+                                                    "value": "@pipeline().parameters.pipeline_run_id",
+                                                    "type": "Expression"
+                                                },
+                                                "gold_table_id": {
+                                                    "value": "@item().gold_table_id",
+                                                    "type": "Expression"
+                                                },
+                                                "target_gold_table": {
+                                                    "value": "@item().target_gold_table",
+                                                    "type": "Expression"
+                                                }
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            }
+        ],
+        "parameters": {
+            "pipeline_run_id": {
+                "type": "string",
+                "defaultValue": "@pipeline().RunId"
+            }
+        },
+        "annotations": []
+    }
+}

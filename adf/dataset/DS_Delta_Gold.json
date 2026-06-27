@@ -1,0 +1,25 @@
+{
+    "name": "DS_Delta_Gold",
+    "properties": {
+        "linkedServiceName": {
+            "referenceName": "LS_AzureDataLakeStorage",
+            "type": "LinkedServiceReference"
+        },
+        "parameters": {
+            "gold_path": {
+                "type": "string"
+            }
+        },
+        "type": "Delta",
+        "typeProperties": {
+            "location": {
+                "type": "AzureBlobFSLocation",
+                "folderPath": {
+                    "value": "@dataset().gold_path",
+                    "type": "Expression"
+                },
+                "fileSystem": "datalake"
+            }
+        }
+    }
+}

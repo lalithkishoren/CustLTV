@@ -1,0 +1,9 @@
+{
+    "name": "LS_AzureSynapse",
+    "properties": {
+        "type": "AzureSqlDW",
+        "typeProperties": {
+            "connectionString": "Integrated Security=False;Encrypt=True;Connection Timeout=30;Data Source={{PLACEHOLDER_SYNAPSE_WORKSPACE}}.sql.azuresynapse.net;Initial Catalog={{PLACEHOLDER_SYNAPSE_POOL}};User ID={{PLACEHOLDER_SQL_USERNAME}};Password={{PLACEHOLDER_SQL_PASSWORD}}"
+        }
+    }
+}

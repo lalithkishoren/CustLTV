@@ -14,7 +14,7 @@
                     },
                     "ifTrueActivities": [
                         {
-                            "name": "Call_Bronze_Orchestrator",
+                            "name": "Run_Bronze",
                             "type": "ExecutePipeline",
                             "dependsOn": [],
                             "userProperties": [],
@@ -26,7 +26,7 @@
                                 "waitOnCompletion": true,
                                 "parameters": {
                                     "pipeline_run_id": {
-                                        "value": "@pipeline().RunId",
+                                        "value": "@pipeline().parameters.pipeline_run_id",
                                         "type": "Expression"
                                     }
                                 }
@@ -55,7 +55,7 @@
                     },
                     "ifTrueActivities": [
                         {
-                            "name": "Call_Silver_Orchestrator",
+                            "name": "Run_Silver",
                             "type": "ExecutePipeline",
                             "dependsOn": [],
                             "userProperties": [],
@@ -67,7 +67,48 @@
                                 "waitOnCompletion": true,
                                 "parameters": {
                                     "pipeline_run_id": {
-                                        "value": "@pipeline().RunId",
+                                        "value": "@pipeline().parameters.pipeline_run_id",
+                                        "type": "Expression"
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                }
+            },
+            {
+                "name": "Execute_Gold_Pipeline",
+                "type": "IfCondition",
+                "dependsOn": [
+                    {
+                        "activity": "Execute_Silver_Pipeline",
+                        "dependencyConditions": [
+                            "Succeeded",
+                            "Skipped"
+                        ]
+                    }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                    "expression": {
+                        "value": "@equals(pipeline().parameters.run_gold, true)",
+                        "type": "Expression"
+                    },
+                    "ifTrueActivities": [
+                        {
+                            "name": "Run_Gold",
+                            "type": "ExecutePipeline",
+                            "dependsOn": [],
+                            "userProperties": [],
+                            "typeProperties": {
+                                "pipeline": {
+                                    "referenceName": "PL_Gold_Orchestrator",
+                                    "type": "PipelineReference"
+                                },
+                                "waitOnCompletion": true,
+                                "parameters": {
+                                    "pipeline_run_id": {
+                                        "value": "@pipeline().parameters.pipeline_run_id",
                                         "type": "Expression"
                                     }
                                 }
@@ -87,6 +128,10 @@
                 "defaultValue": true
             },
             "run_silver": {
+                "type": "bool",
+                "defaultValue": true
+            },
+            "run_gold": {
                 "type": "bool",
                 "defaultValue": true
             }

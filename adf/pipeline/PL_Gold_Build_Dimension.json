@@ -1,0 +1,156 @@
+{
+    "name": "PL_Gold_Build_Dimension",
+    "properties": {
+        "activities": [
+            {
+                "name": "Notebook_BuildDimension",
+                "type": "DatabricksNotebook",
+                "dependsOn": [],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 3,
+                    "retryIntervalInSeconds": 300,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "notebookPath": "/Shared/gold/Gold_Build_Dimension",
+                    "baseParameters": {
+                        "pipeline_run_id": {
+                            "value": "@pipeline().parameters.pipeline_run_id",
+                            "type": "Expression"
+                        },
+                        "gold_table_id": {
+                            "value": "@pipeline().parameters.gold_table_id",
+                            "type": "Expression"
+                        },
+                        "source_silver_tables": {
+                            "value": "@pipeline().parameters.source_silver_tables",
+                            "type": "Expression"
+                        },
+                        "target_gold_table": {
+                            "value": "@pipeline().parameters.target_gold_table",
+                            "type": "Expression"
+                        },
+                        "storage_account": "{{PLACEHOLDER_STORAGE_ACCOUNT}}",
+                        "storage_access_key": "{{PLACEHOLDER_STORAGE_KEY}}"
+                    }
+                },
+                "linkedServiceName": {
+                    "referenceName": "LS_AzureDatabricks",
+                    "type": "LinkedServiceReference"
+                }
+            },
+            {
+                "name": "SP_UpdateGoldStatus_Success",
+                "type": "SqlServerStoredProcedure",
+                "dependsOn": [
+                    {
+                        "activity": "Notebook_BuildDimension",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                    "storedProcedureName": "[control].[sp_UpdateGoldTableStatus]",
+                    "storedProcedureParameters": {
+                        "GoldTableId": {
+                            "value": {
+                                "value": "@pipeline().parameters.gold_table_id",
+                                "type": "Expression"
+                            },
+                            "type": "Int32"
+                        },
+                        "Status": {
+                            "value": "SUCCESS",
+                            "type": "String"
+                        },
+                        "PipelineRunId": {
+                            "value": {
+                                "value": "@pipeline().parameters.pipeline_run_id",
+                                "type": "Expression"
+                            },
+                            "type": "String"
+                        },
+                        "RecordsProcessed": {
+                            "value": {
+                                "value": "@activity('Notebook_BuildDimension').output.runOutput",
+                                "type": "Expression"
+                            },
+                            "type": "Int64"
+                        }
+                    }
+                },
+                "linkedServiceName": {
+                    "referenceName": "LS_AzureSQL_Control",
+                    "type": "LinkedServiceReference"
+                }
+            },
+            {
+                "name": "SP_UpdateGoldStatus_Failure",
+                "type": "SqlServerStoredProcedure",
+                "dependsOn": [
+                    {
+                        "activity": "Notebook_BuildDimension",
+                        "dependencyConditions": [
+                            "Failed"
+                        ]
+                    }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                    "storedProcedureName": "[control].[sp_UpdateGoldTableStatus]",
+                    "storedProcedureParameters": {
+                        "GoldTableId": {
+                            "value": {
+                                "value": "@pipeline().parameters.gold_table_id",
+                                "type": "Expression"
+                            },
+                            "type": "Int32"
+                        },
+                        "Status": {
+                            "value": "FAILED",
+                            "type": "String"
+                        },
+                        "PipelineRunId": {
+                            "value": {
+                                "value": "@pipeline().parameters.pipeline_run_id",
+                                "type": "Expression"
+                            },
+                            "type": "String"
+                        },
+                        "ErrorMessage": {
+                            "value": {
+                                "value": "@activity('Notebook_BuildDimension').error.message",
+                                "type": "Expression"
+                            },
+                            "type": "String"
+                        }
+                    }
+                },
+                "linkedServiceName": {
+                    "referenceName": "LS_AzureSQL_Control",
+                    "type": "LinkedServiceReference"
+                }
+            }
+        ],
+        "parameters": {
+            "pipeline_run_id": {
+                "type": "string"
+            },
+            "gold_table_id": {
+                "type": "int"
+            },
+            "source_silver_tables": {
+                "type": "string"
+            },
+            "target_gold_table": {
+                "type": "string"
+            }
+        },
+        "annotations": []
+    }
+}
