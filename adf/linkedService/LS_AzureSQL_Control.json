@@ -1,0 +1,9 @@
+{
+    "name": "LS_AzureSQL_Control",
+    "properties": {
+        "type": "AzureSqlDatabase",
+        "typeProperties": {
+            "connectionString": "Integrated Security=False;Encrypt=True;Connection Timeout=30;Data Source=sql-clv-control-prod.database.windows.net;Initial Catalog=sqldb-clv-control-prod;User ID={{PLACEHOLDER_SQL_USERNAME}};Password={{PLACEHOLDER_SQL_PASSWORD}}"
+        }
+    }
+}
