@@ -1,0 +1,13 @@
+{
+    "name": "LS_AzureDataLakeStorage",
+    "properties": {
+        "type": "AzureBlobFS",
+        "typeProperties": {
+            "url": "https://stclvbronzeprod001.dfs.core.windows.net",
+            "accountKey": {
+                "type": "SecureString",
+                "value": "{{PLACEHOLDER_STORAGE_KEY}}"
+            }
+        }
+    }
+}
