@@ -1,0 +1,14 @@
+{
+    "name": "LS_AzureDatabricks",
+    "properties": {
+        "type": "AzureDatabricks",
+        "typeProperties": {
+            "domain": "https://adb-clv-workspace-prod.azuredatabricks.net",
+            "accessToken": {
+                "type": "SecureString",
+                "value": "{{PLACEHOLDER_DATABRICKS_TOKEN}}"
+            },
+            "existingClusterId": "{{PLACEHOLDER_CLUSTER_ID}}"
+        }
+    }
+}
