@@ -3,7 +3,7 @@
     "properties": {
         "type": "AzureDatabricks",
         "typeProperties": {
-            "domain": "https://adb-clv-workspace-prod.azuredatabricks.net",
+            "domain": "https://{{PLACEHOLDER_DATABRICKS_WORKSPACE_URL}}",
             "accessToken": {
                 "type": "SecureString",
                 "value": "{{PLACEHOLDER_DATABRICKS_TOKEN}}"

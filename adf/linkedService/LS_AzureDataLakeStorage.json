@@ -3,7 +3,7 @@
     "properties": {
         "type": "AzureBlobFS",
         "typeProperties": {
-            "url": "https://stclvbronzeprod001.dfs.core.windows.net",
+            "url": "https://{{PLACEHOLDER_STORAGE_ACCOUNT}}.dfs.core.windows.net",
             "accountKey": {
                 "type": "SecureString",
                 "value": "{{PLACEHOLDER_STORAGE_KEY}}"
