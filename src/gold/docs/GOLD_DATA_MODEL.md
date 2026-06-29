@@ -1,27 +1,31 @@
 # Gold Layer Data Model
 
 ## Overview
-The Gold layer implements an Enterprise Data Warehouse Bus Architecture using a Star Schema optimized for BI querying, CLV analytics, and RFM segmentation.
+The Gold layer implements an Enterprise Data Warehouse Bus Architecture utilizing conformed dimensions and a Star Schema design optimized for Power BI DirectQuery and ML feature extraction.
 
-## Dimensions (Conformed)
-- **dim_customer** (SCD Type 2): Tracks customer history, churn status, and segmentation.
-- **dim_product** (SCD Type 1): Product hierarchy (Brand -> Category -> Product).
-- **dim_location** (SCD Type 1): Geographic data and city tiers.
-- **dim_campaign** (SCD Type 1): Marketing campaign details.
-- **dim_registration_source** (SCD Type 1): Acquisition channel details.
-- **dim_date**: Standard calendar dimension.
+## Dimension Tables
+| Table Name | SCD Type | Business Key | Description |
+|------------|----------|--------------|-------------|
+| `dim_customer` | Type 2 | `customer_id` | Customer master with history tracking for churn status. |
+| `dim_product` | Type 1 | `inventory_item_id` | Product hierarchy (Brand -> Category -> Product). |
+| `dim_location` | Type 1 | `address_id` | Geographic data and city tiers. |
+| `dim_campaign` | Type 1 | `campaign_id` | Marketing campaigns. Includes `-2` Organic member. |
+| `dim_registration_source` | Type 1 | `registration_source_id` | Acquisition channel data. |
 
-## Facts
-- **fact_sales**: Transaction grain (Order Line). Contains additive measures (`quantity`, `line_total`) and allocated discounts.
-- **fact_interactions**: Transaction grain (Customer Support Interaction).
-- **fact_surveys**: Transaction grain (Survey Response). Contains non-additive measures (`nps_score`, `csat_score`).
+## Fact Tables
+| Table Name | Grain | Partitioning | Description |
+|------------|-------|--------------|-------------|
+| `fact_sales` | Order Line | `order_year_month` | Revenue, discounts, and product sales. |
+| `fact_interactions` | Interaction | `interaction_year_month` | Customer service touchpoints. |
+| `fact_surveys` | Survey Response | `response_year_month` | NPS and CSAT scores. |
 
-## Aggregates (KPIs)
-- **agg_monthly_campaign_roi**: Monthly grain. Calculates Customer Acquisition Cost (CAC) and Return on Ad Spend (ROAS).
-- **agg_customer_clv_metrics**: Customer grain. Calculates Average Order Value (AOV), Purchase Frequency, and Customer Lifespan.
+## Aggregate Tables (KPIs)
+| Table Name | Grain | Key Metrics |
+|------------|-------|-------------|
+| `agg_monthly_campaign_roi` | Month, Campaign | CAC, ROAS, Total Revenue, Total Spend |
+| `agg_customer_clv_metrics` | Customer | AOV, Purchase Frequency, Lifespan Days, Lifetime Revenue |
 
-## Key Business Rules Implemented
-1. **CAC Calculation**: `SUM(total_spend) / NULLIF(SUM(customers_acquired), 0)`. Organic channels explicitly have 0 CAC.
-2. **AOV Calculation**: `SUM(line_total) / COUNT(DISTINCT order_number)`.
-3. **SCD2 Event Time**: Customer history validity windows are based on the source system's `last_update_date` (Event Time), not pipeline processing time.
-4. **Referential Integrity**: Missing dimension keys default to `-1` (Unknown). Organic campaigns default to `-2`.
+## Data Quality & Governance
+- **Referential Integrity**: Enforced via `COALESCE(key, -1)` during Fact loads.
+- **Idempotency**: Guaranteed via Delta `MERGE` (Dimensions) and dynamic partition overwrite (Facts).
+- **Authentication**: Strictly Unity Catalog Managed Identity. No secrets in code.

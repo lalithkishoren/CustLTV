@@ -17,7 +17,7 @@
                 "typeProperties": {
                     "source": {
                         "type": "AzureSqlSource",
-                        "sqlReaderQuery": "SELECT * FROM control.silver_table_config WHERE is_active = 1 ORDER BY load_priority ASC",
+                        "sqlReaderQuery": "SELECT silver_table_id, source_system, schema_name, source_bronze_table, target_silver_table, primary_key_columns, scd_type, track_history_columns, partition_columns, z_order_columns FROM control.silver_table_config WHERE is_active = 1 ORDER BY silver_table_id ASC",
                         "queryTimeout": "02:00:00",
                         "partitionOption": "None"
                     },
@@ -45,10 +45,11 @@
                         "value": "@activity('Lookup_ActiveSilverTables').output.value",
                         "type": "Expression"
                     },
-                    "isSequential": true,
+                    "isSequential": false,
+                    "batchCount": 5,
                     "activities": [
                         {
-                            "name": "Execute_Silver_Transform",
+                            "name": "Execute_Silver_Transform_Single_Table",
                             "type": "ExecutePipeline",
                             "dependsOn": [],
                             "userProperties": [],
@@ -67,16 +68,20 @@
                                         "value": "@item().silver_table_id",
                                         "type": "Expression"
                                     },
-                                    "source_bronze_path": {
-                                        "value": "@item().source_bronze_path",
+                                    "source_system": {
+                                        "value": "@item().source_system",
                                         "type": "Expression"
                                     },
-                                    "target_silver_path": {
-                                        "value": "@item().target_silver_path",
+                                    "schema_name": {
+                                        "value": "@item().schema_name",
                                         "type": "Expression"
                                     },
-                                    "table_name": {
-                                        "value": "@item().table_name",
+                                    "source_bronze_table": {
+                                        "value": "@item().source_bronze_table",
+                                        "type": "Expression"
+                                    },
+                                    "target_silver_table": {
+                                        "value": "@item().target_silver_table",
                                         "type": "Expression"
                                     },
                                     "primary_key_columns": {
@@ -85,6 +90,10 @@
                                     },
                                     "scd_type": {
                                         "value": "@item().scd_type",
+                                        "type": "Expression"
+                                    },
+                                    "track_history_columns": {
+                                        "value": "@item().track_history_columns",
                                         "type": "Expression"
                                     },
                                     "partition_columns": {

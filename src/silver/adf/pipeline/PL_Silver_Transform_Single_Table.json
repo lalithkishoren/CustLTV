@@ -50,7 +50,7 @@
                 ],
                 "policy": {
                     "timeout": "0.12:00:00",
-                    "retry": 2,
+                    "retry": 1,
                     "retryIntervalInSeconds": 300,
                     "secureOutput": false,
                     "secureInput": false
@@ -67,16 +67,20 @@
                             "value": "@pipeline().parameters.silver_table_id",
                             "type": "Expression"
                         },
-                        "source_bronze_path": {
-                            "value": "@pipeline().parameters.source_bronze_path",
+                        "source_system": {
+                            "value": "@pipeline().parameters.source_system",
                             "type": "Expression"
                         },
-                        "target_silver_path": {
-                            "value": "@pipeline().parameters.target_silver_path",
+                        "schema_name": {
+                            "value": "@pipeline().parameters.schema_name",
                             "type": "Expression"
                         },
-                        "table_name": {
-                            "value": "@pipeline().parameters.table_name",
+                        "source_bronze_table": {
+                            "value": "@pipeline().parameters.source_bronze_table",
+                            "type": "Expression"
+                        },
+                        "target_silver_table": {
+                            "value": "@pipeline().parameters.target_silver_table",
                             "type": "Expression"
                         },
                         "primary_key_columns": {
@@ -85,6 +89,10 @@
                         },
                         "scd_type": {
                             "value": "@pipeline().parameters.scd_type",
+                            "type": "Expression"
+                        },
+                        "track_history_columns": {
+                            "value": "@pipeline().parameters.track_history_columns",
                             "type": "Expression"
                         },
                         "partition_columns": {
@@ -99,10 +107,7 @@
                             "value": "@string(activity('Lookup_TransformationRules').output.value)",
                             "type": "Expression"
                         },
-                        "storage_account": {
-                            "value": "{{PLACEHOLDER_STORAGE_ACCOUNT}}",
-                            "type": "Expression"
-                        }
+                        "storage_account": "stdataplatformdevnda0jg"
                     }
                 },
                 "linkedServiceName": {
@@ -160,20 +165,6 @@
                         "RecordsWritten": {
                             "value": {
                                 "value": "@activity('Notebook_SilverTransform').output.runOutput.records_written",
-                                "type": "Expression"
-                            },
-                            "type": "Int64"
-                        },
-                        "RecordsFiltered": {
-                            "value": {
-                                "value": "@activity('Notebook_SilverTransform').output.runOutput.records_filtered",
-                                "type": "Expression"
-                            },
-                            "type": "Int64"
-                        },
-                        "RecordsQuarantined": {
-                            "value": {
-                                "value": "@activity('Notebook_SilverTransform').output.runOutput.records_quarantined",
                                 "type": "Expression"
                             },
                             "type": "Int64"
@@ -247,13 +238,16 @@
             "silver_table_id": {
                 "type": "int"
             },
-            "source_bronze_path": {
+            "source_system": {
                 "type": "string"
             },
-            "target_silver_path": {
+            "schema_name": {
                 "type": "string"
             },
-            "table_name": {
+            "source_bronze_table": {
+                "type": "string"
+            },
+            "target_silver_table": {
                 "type": "string"
             },
             "primary_key_columns": {
@@ -261,6 +255,9 @@
             },
             "scd_type": {
                 "type": "int"
+            },
+            "track_history_columns": {
+                "type": "string"
             },
             "partition_columns": {
                 "type": "string"

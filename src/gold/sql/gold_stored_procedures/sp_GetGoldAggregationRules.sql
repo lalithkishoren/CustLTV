@@ -1,4 +1,4 @@
-CREATE PROCEDURE [control].[sp_GetGoldAggregationRules]
+CREATE OR ALTER PROCEDURE [control].[sp_GetGoldAggregationRules]
     @GoldTableId INT
 AS
 BEGIN

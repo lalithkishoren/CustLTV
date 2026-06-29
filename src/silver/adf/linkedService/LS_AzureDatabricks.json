@@ -3,9 +3,9 @@
     "properties": {
         "type": "AzureDatabricks",
         "typeProperties": {
-            "domain": "https://{{PLACEHOLDER_DATABRICKS_WORKSPACE_URL}}",
+            "domain": "adb-7405616217745241.1.azuredatabricks.net",
             "authentication": "ManagedIdentity",
-            "workspaceResourceId": "/subscriptions/{{PLACEHOLDER_SUBSCRIPTION_ID}}/resourceGroups/{{PLACEHOLDER_RESOURCE_GROUP}}/providers/Microsoft.Databricks/workspaces/{{PLACEHOLDER_DATABRICKS_WORKSPACE_NAME}}",
+            "workspaceResourceId": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-dataplatform-dev-centralindia/providers/Microsoft.Databricks/workspaces/databricks-workspace",
             "existingClusterId": "{{PLACEHOLDER_CLUSTER_ID}}"
         }
     }

@@ -3,7 +3,7 @@
     "properties": {
         "type": "AzureBlobFS",
         "typeProperties": {
-            "url": "https://{{PLACEHOLDER_STORAGE_ACCOUNT}}.dfs.core.windows.net"
+            "url": "https://stdataplatformdevnda0jg.dfs.core.windows.net"
         },
         "description": "Managed Identity connection to ADLS Gen2 for ADF Copy Activities."
     }

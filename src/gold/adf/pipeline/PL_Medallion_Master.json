@@ -14,7 +14,7 @@
                     },
                     "ifTrueActivities": [
                         {
-                            "name": "Call_Bronze_Orchestrator",
+                            "name": "Run_Bronze",
                             "type": "ExecutePipeline",
                             "dependsOn": [],
                             "userProperties": [],
@@ -23,13 +23,7 @@
                                     "referenceName": "PL_Bronze_Orchestrator",
                                     "type": "PipelineReference"
                                 },
-                                "waitOnCompletion": true,
-                                "parameters": {
-                                    "pipeline_run_id": {
-                                        "value": "@pipeline().parameters.pipeline_run_id",
-                                        "type": "Expression"
-                                    }
-                                }
+                                "waitOnCompletion": true
                             }
                         }
                     ]
@@ -55,7 +49,7 @@
                     },
                     "ifTrueActivities": [
                         {
-                            "name": "Call_Silver_Orchestrator",
+                            "name": "Run_Silver",
                             "type": "ExecutePipeline",
                             "dependsOn": [],
                             "userProperties": [],
@@ -64,13 +58,7 @@
                                     "referenceName": "PL_Silver_Orchestrator",
                                     "type": "PipelineReference"
                                 },
-                                "waitOnCompletion": true,
-                                "parameters": {
-                                    "pipeline_run_id": {
-                                        "value": "@pipeline().parameters.pipeline_run_id",
-                                        "type": "Expression"
-                                    }
-                                }
+                                "waitOnCompletion": true
                             }
                         }
                     ]
@@ -96,7 +84,7 @@
                     },
                     "ifTrueActivities": [
                         {
-                            "name": "Call_Gold_Orchestrator",
+                            "name": "Run_Gold",
                             "type": "ExecutePipeline",
                             "dependsOn": [],
                             "userProperties": [],
@@ -105,13 +93,7 @@
                                     "referenceName": "PL_Gold_Orchestrator",
                                     "type": "PipelineReference"
                                 },
-                                "waitOnCompletion": true,
-                                "parameters": {
-                                    "pipeline_run_id": {
-                                        "value": "@pipeline().parameters.pipeline_run_id",
-                                        "type": "Expression"
-                                    }
-                                }
+                                "waitOnCompletion": true
                             }
                         }
                     ]

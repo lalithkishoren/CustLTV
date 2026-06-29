@@ -14,13 +14,12 @@
         "typeProperties": {
             "location": {
                 "type": "AzureBlobFSLocation",
+                "fileSystem": "silver",
                 "folderPath": {
                     "value": "@dataset().silver_path",
                     "type": "Expression"
-                },
-                "fileSystem": "silver"
+                }
             }
-        },
-        "annotations": []
+        }
     }
 }

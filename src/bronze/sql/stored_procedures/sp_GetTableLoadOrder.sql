@@ -20,7 +20,7 @@ BEGIN
 
         UNION ALL
 
-        -- Recursive case: Tables that depend on already processed tables
+        -- Recursive case: Tables that depend on others
         SELECT 
             t.table_id,
             t.schema_name,
@@ -28,8 +28,8 @@ BEGIN
             t.load_priority,
             dt.dependency_level + 1
         FROM control.table_metadata t
-        INNER JOIN control.load_dependencies d ON t.table_id = d.table_id
-        INNER JOIN DependencyTree dt ON d.depends_on_table_id = dt.table_id
+        JOIN control.load_dependencies d ON t.table_id = d.table_id
+        JOIN DependencyTree dt ON d.depends_on_table_id = dt.table_id
         WHERE t.is_active = 1
           AND (@SourceSystemId IS NULL OR t.source_system_id = @SourceSystemId)
     )
@@ -40,14 +40,7 @@ BEGIN
         MAX(dependency_level) AS max_dependency_level,
         load_priority
     FROM DependencyTree
-    GROUP BY 
-        table_id,
-        schema_name,
-        table_name,
-        load_priority
-    ORDER BY 
-        max_dependency_level ASC,
-        load_priority ASC,
-        table_name ASC;
+    GROUP BY table_id, schema_name, table_name, load_priority
+    ORDER BY max_dependency_level ASC, load_priority ASC, table_name ASC;
 END
 GO

@@ -10,7 +10,7 @@
                 "type": "string"
             }
         },
-        "type": "Delta",
+        "type": "Parquet",
         "typeProperties": {
             "location": {
                 "type": "AzureBlobFSLocation",

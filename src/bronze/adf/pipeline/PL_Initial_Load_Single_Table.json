@@ -18,7 +18,7 @@
                     "source": {
                         "type": "AzureSqlSource",
                         "sqlReaderQuery": {
-                            "value": "SELECT * FROM @{pipeline().parameters.schema_name}.@{pipeline().parameters.table_name}",
+                            "value": "SELECT * FROM [@{pipeline().parameters.schema_name}].[@{pipeline().parameters.table_name}]",
                             "type": "Expression"
                         },
                         "queryTimeout": "02:00:00",
@@ -123,15 +123,84 @@
                             "value": "@pipeline().parameters.primary_key_columns",
                             "type": "Expression"
                         },
-                        "storage_account": "{{PLACEHOLDER_STORAGE_ACCOUNT}}",
-                        "sql_server": "{{PLACEHOLDER_SQL_SERVER_FQDN}}",
-                        "sql_database": "{{PLACEHOLDER_SQL_DATABASE}}",
+                        "storage_account": {
+                            "value": "@pipeline().parameters.storage_account",
+                            "type": "Expression"
+                        },
+                        "sql_server": "sql-dataplatform-dev-nda0jg.database.windows.net",
+                        "sql_database": "sqldb-control-dataplatform-dev",
                         "sql_username": "{{PLACEHOLDER_SQL_USERNAME}}",
                         "sql_password": "{{PLACEHOLDER_SQL_PASSWORD}}"
                     }
                 },
                 "linkedServiceName": {
                     "referenceName": "LS_AzureDatabricks",
+                    "type": "LinkedServiceReference"
+                }
+            },
+            {
+                "name": "SP_UpdateMetadata_Failure",
+                "type": "SqlServerStoredProcedure",
+                "dependsOn": [
+                    {
+                        "activity": "Notebook_InitialLoad",
+                        "dependencyConditions": [
+                            "Failed"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "storedProcedureName": "[control].[sp_UpdateTableMetadata]",
+                    "storedProcedureParameters": {
+                        "TableId": {
+                            "value": {
+                                "value": "@pipeline().parameters.table_id",
+                                "type": "Expression"
+                            },
+                            "type": "Int32"
+                        },
+                        "Status": {
+                            "value": "FAILED",
+                            "type": "String"
+                        },
+                        "PipelineRunId": {
+                            "value": {
+                                "value": "@pipeline().parameters.pipeline_run_id",
+                                "type": "Expression"
+                            },
+                            "type": "Guid"
+                        },
+                        "RecordsLoaded": {
+                            "value": "0",
+                            "type": "Int64"
+                        },
+                        "SyncVersion": {
+                            "value": null,
+                            "type": "String"
+                        },
+                        "MarkInitialLoadComplete": {
+                            "value": "0",
+                            "type": "Boolean"
+                        },
+                        "ErrorMessage": {
+                            "value": {
+                                "value": "@activity('Notebook_InitialLoad').error.message",
+                                "type": "Expression"
+                            },
+                            "type": "String"
+                        }
+                    }
+                },
+                "linkedServiceName": {
+                    "referenceName": "LS_AzureSQL_Control",
                     "type": "LinkedServiceReference"
                 }
             }
@@ -141,7 +210,7 @@
                 "type": "string"
             },
             "table_id": {
-                "type": "string"
+                "type": "int"
             },
             "source_system": {
                 "type": "string"
@@ -153,6 +222,9 @@
                 "type": "string"
             },
             "primary_key_columns": {
+                "type": "string"
+            },
+            "storage_account": {
                 "type": "string"
             }
         },

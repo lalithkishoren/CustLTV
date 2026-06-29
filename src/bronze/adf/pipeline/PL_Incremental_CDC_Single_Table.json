@@ -41,7 +41,7 @@
                                 }
                             },
                             "LastSyncVersion": {
-                                "type": "String",
+                                "type": "Int64",
                                 "value": {
                                     "value": "@pipeline().parameters.last_sync_version",
                                     "type": "Expression"
@@ -165,9 +165,12 @@
                                         "value": "@pipeline().parameters.last_sync_version",
                                         "type": "Expression"
                                     },
-                                    "storage_account": "{{PLACEHOLDER_STORAGE_ACCOUNT}}",
-                                    "sql_server": "{{PLACEHOLDER_SQL_SERVER_FQDN}}",
-                                    "sql_database": "{{PLACEHOLDER_SQL_DATABASE}}",
+                                    "storage_account": {
+                                        "value": "@pipeline().parameters.storage_account",
+                                        "type": "Expression"
+                                    },
+                                    "sql_server": "sql-dataplatform-dev-nda0jg.database.windows.net",
+                                    "sql_database": "sqldb-control-dataplatform-dev",
                                     "sql_username": "{{PLACEHOLDER_SQL_USERNAME}}",
                                     "sql_password": "{{PLACEHOLDER_SQL_PASSWORD}}"
                                 }
@@ -183,6 +186,13 @@
                             "name": "SP_UpdateMetadata_NoChanges",
                             "type": "SqlServerStoredProcedure",
                             "dependsOn": [],
+                            "policy": {
+                                "timeout": "0.12:00:00",
+                                "retry": 0,
+                                "retryIntervalInSeconds": 30,
+                                "secureOutput": false,
+                                "secureInput": false
+                            },
                             "userProperties": [],
                             "typeProperties": {
                                 "storedProcedureName": "[control].[sp_UpdateTableMetadata]",
@@ -219,6 +229,10 @@
                                     "MarkInitialLoadComplete": {
                                         "value": "0",
                                         "type": "Boolean"
+                                    },
+                                    "ErrorMessage": {
+                                        "value": null,
+                                        "type": "String"
                                     }
                                 }
                             },
@@ -236,7 +250,7 @@
                 "type": "string"
             },
             "table_id": {
-                "type": "string"
+                "type": "int"
             },
             "source_system": {
                 "type": "string"
@@ -251,6 +265,9 @@
                 "type": "string"
             },
             "last_sync_version": {
+                "type": "string"
+            },
+            "storage_account": {
                 "type": "string"
             }
         },

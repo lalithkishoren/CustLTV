@@ -10,7 +10,6 @@
         "typeProperties": {
             "schema": "control",
             "table": "gold_table_config"
-        },
-        "annotations": []
+        }
     }
 }

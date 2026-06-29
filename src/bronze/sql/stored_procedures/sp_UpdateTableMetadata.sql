@@ -29,7 +29,6 @@ BEGIN
         INSERT INTO control.pipeline_execution_log (
             pipeline_run_id, 
             table_id, 
-            execution_start_time, 
             execution_end_time, 
             status, 
             rows_written, 
@@ -38,7 +37,6 @@ BEGIN
         VALUES (
             @PipelineRunId,
             @TableId,
-            GETUTCDATE(), -- In a real scenario, start time would be passed in. Using current for simplicity.
             GETUTCDATE(),
             @Status,
             @RecordsLoaded,

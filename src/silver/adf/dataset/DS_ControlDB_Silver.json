@@ -1,0 +1,15 @@
+{
+  "name": "DS_ControlDB_Silver",
+  "properties": {
+    "linkedServiceName": {
+      "referenceName": "LS_AzureSQL_Control",
+      "type": "LinkedServiceReference"
+    },
+    "type": "AzureSqlTable",
+    "schema": [],
+    "typeProperties": {
+      "schema": "control",
+      "table": "silver_table_config"
+    }
+  }
+}

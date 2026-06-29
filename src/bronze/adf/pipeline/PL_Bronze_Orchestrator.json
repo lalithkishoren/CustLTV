@@ -50,7 +50,6 @@
                         "type": "Expression"
                     },
                     "isSequential": false,
-                    "batchCount": 5,
                     "activities": [
                         {
                             "name": "IfCondition_LoadType",
@@ -98,7 +97,8 @@
                                                 "primary_key_columns": {
                                                     "value": "@item().primary_key_columns",
                                                     "type": "Expression"
-                                                }
+                                                },
+                                                "storage_account": "stdataplatformdevnda0jg"
                                             }
                                         }
                                     }
@@ -143,7 +143,8 @@
                                                 "last_sync_version": {
                                                     "value": "@item().last_sync_version",
                                                     "type": "Expression"
-                                                }
+                                                },
+                                                "storage_account": "stdataplatformdevnda0jg"
                                             }
                                         }
                                     }

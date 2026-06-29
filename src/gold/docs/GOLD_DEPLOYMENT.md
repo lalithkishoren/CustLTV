@@ -1,40 +1,30 @@
 # Gold Layer Deployment Guide
 
 ## Prerequisites
-1. **Unity Catalog**: Configured with Managed Identity (Databricks Access Connector).
-2. **Storage**: ADLS Gen2 account with `gold` container.
-3. **Silver Layer**: Must be fully deployed and populated.
-4. **Control Database**: Azure SQL Database for metadata.
+1. **Silver Layer**: Must be fully deployed and populated.
+2. **Unity Catalog**: Configured with Managed Identity (Access Connector).
+3. **Azure SQL Control DB**: Provisioned and accessible via Managed Identity.
 
 ## Deployment Steps
 
 ### 1. Control Database Setup
-Execute the SQL scripts in the `sql/gold_control_tables/` directory against the Control DB:
-1. `01_create_gold_control_tables.sql`
-2. `02_populate_gold_config.sql`
+Execute the SQL scripts in the `sql/gold_control_tables/` directory against the Azure SQL Control Database:
+1. Run `01_create_gold_control_tables.sql` to create the schema and tables.
+2. Run `02_populate_gold_config.sql` to insert the LLD configurations.
+3. Execute the scripts in `sql/gold_stored_procedures/` to create the required SPs.
 
-Execute the stored procedure scripts in `sql/gold_stored_procedures/`:
-1. `sp_UpdateGoldTableStatus.sql`
-2. `sp_GetGoldAggregationRules.sql`
-3. `sp_GetGoldDimensionConfig.sql`
+### 2. Azure Data Factory Setup
+1. Import the Linked Services from `adf/linkedService/`. Ensure placeholders (e.g., `stdataplatformdevnda0jg`) are replaced with actual values or Key Vault references.
+2. Import the Datasets from `adf/dataset/`.
+3. Import the Pipelines from `adf/pipeline/`.
 
-### 2. Databricks Setup
-1. Import the notebooks from `databricks/notebooks/gold/` into the Databricks workspace under `/Shared/gold/`.
-2. Ensure the cluster used by ADF has Unity Catalog enabled.
-3. **CRITICAL**: Do NOT configure `fs.azure.account.key` in the cluster or notebooks. Unity Catalog handles all ADLS authorization via External Locations.
-
-### 3. Azure Data Factory Setup
-1. Import Linked Services from `adf/linkedService/`. Ensure Managed Identity is granted access to ADLS, Databricks, and SQL.
-2. Import Datasets from `adf/dataset/`.
-3. Import Pipelines from `adf/pipeline/`.
+### 3. Databricks Setup
+1. Import the notebooks from `databricks/notebooks/gold/` into the `/Shared/gold/` workspace directory.
+2. Ensure the Databricks cluster has Unity Catalog enabled. No storage keys should be configured in the cluster environment variables.
 
 ### 4. Initial Load Execution
-1. Trigger `PL_Medallion_Master` with parameters:
+1. Trigger `PL_Medallion_Master` in ADF with parameters:
    - `run_bronze`: false
    - `run_silver`: false
    - `run_gold`: true
-2. Monitor the execution in ADF Monitor. The orchestrator will automatically process Dimensions first, then Facts, then Aggregates.
-
-## Security & Governance
-- **Data Masking**: Apply Unity Catalog Dynamic Data Masking on `dim_customer.email` and `dim_customer.phone`.
-- **Access Control**: Grant `SELECT` on `gold.marts` to BI Service Principals.
+2. Monitor the execution in ADF Monitor. The orchestrator will automatically build Dimensions first, then Facts, then Aggregates.

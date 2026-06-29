@@ -38,8 +38,8 @@
     }
   ],
   "configuration": {
-    "pipelines.bronze.storage_path": "abfss://bronze@{{PLACEHOLDER_STORAGE_ACCOUNT}}.dfs.core.windows.net/",
-    "pipelines.silver.storage_path": "abfss://silver@{{PLACEHOLDER_STORAGE_ACCOUNT}}.dfs.core.windows.net/",
-    "pipelines.gold.storage_path": "abfss://gold@{{PLACEHOLDER_STORAGE_ACCOUNT}}.dfs.core.windows.net/"
+    "pipelines.bronze.storage_path": "abfss://bronze@stdataplatformdevnda0jg.dfs.core.windows.net/",
+    "pipelines.silver.storage_path": "abfss://silver@stdataplatformdevnda0jg.dfs.core.windows.net/",
+    "pipelines.gold.storage_path": "abfss://gold@stdataplatformdevnda0jg.dfs.core.windows.net/"
   }
 }

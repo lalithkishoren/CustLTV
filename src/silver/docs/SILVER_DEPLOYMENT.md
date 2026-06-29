@@ -2,36 +2,28 @@
 
 ## Prerequisites
 1. **Bronze Layer**: The Bronze layer must be fully deployed and operational.
-2. **Unity Catalog**: Managed Identity (Access Connector) must be configured with `Storage Blob Data Contributor` on the ADLS Gen2 account. External Locations for `abfss://silver@...` must be registered.
-3. **Azure SQL Database**: The control database must be accessible via ADF Managed Identity.
+2. **Unity Catalog**: Managed Identity access must be configured. Databricks Access Connector must have `Storage Blob Data Contributor` on the ADLS Gen2 account.
+3. **Azure SQL**: The `control` schema must exist.
 
 ## Deployment Steps
 
-### 1. Control Database Setup
+### 1. Database Setup
 Execute the SQL scripts in the following order against the Azure SQL Control Database:
-1. `sql/silver_control_tables/01_create_silver_control_tables.sql` - Creates the schema and tables.
-2. `sql/silver_control_tables/02_populate_silver_config.sql` - Populates the metadata for the 13 in-scope tables and their transformation rules.
-3. `sql/silver_stored_procedures/sp_UpdateSilverTableStatus.sql` - Creates the status update SP.
-4. `sql/silver_stored_procedures/sp_GetSilverTransformationRules.sql` - Creates the rule retrieval SP.
+1. `sql/silver_control_tables/01_create_silver_control_tables.sql`
+2. `sql/silver_control_tables/02_populate_silver_config.sql`
+3. `sql/silver_stored_procedures/sp_UpdateSilverTableStatus.sql`
+4. `sql/silver_stored_procedures/sp_GetSilverTransformationRules.sql`
 
-### 2. Databricks Notebooks
-Upload the following notebooks to the Databricks workspace under `/Shared/silver/`:
-- `Silver_Transform_Dynamic.py`
-- `Silver_Data_Quality.py`
-- `Silver_Schema_Evolution.py`
+### 2. Databricks Setup
+1. Import the notebooks from `databricks/notebooks/silver/` into your Databricks workspace under `/Shared/silver/`.
+2. Ensure the cluster referenced by `{{PLACEHOLDER_CLUSTER_ID}}` has Unity Catalog enabled.
 
-*Note: No secrets or storage keys need to be configured in Databricks. Unity Catalog handles all ADLS authentication natively.*
+### 3. Azure Data Factory Setup
+1. Deploy Linked Services (`LS_AzureDataLakeStorage`, `LS_AzureDatabricks`, `LS_AzureSQL_Control`).
+2. Deploy Datasets (`DS_Delta_Bronze`, `DS_Delta_Silver`, `DS_ControlDB_Silver`).
+3. Deploy Pipelines (`PL_Silver_Transform_Single_Table`, `PL_Silver_Orchestrator`, `PL_Medallion_Master`).
 
-### 3. Azure Data Factory (ADF)
-Deploy the ADF components in the following order:
-1. **Linked Services**: `LS_AzureDataLakeStorage.json`, `LS_AzureDatabricks.json`, `LS_AzureSQL_Control.json`.
-2. **Datasets**: `DS_Delta_Bronze.json`, `DS_Delta_Silver.json`, `DS_ControlDB_Silver.json`.
-3. **Pipelines**: 
-   - `PL_Silver_Transform_Single_Table.json`
-   - `PL_Silver_Orchestrator.json`
-   - `PL_Medallion_Master.json` (Replaces the Bronze-only master pipeline)
-
-## Validation
+### 4. Validation
 1. Trigger `PL_Medallion_Master` with `run_bronze = false` and `run_silver = true`.
-2. Verify that `control.silver_execution_log` populates with successful runs.
-3. Verify that quarantined records (e.g., `TOTAL_AMOUNT <= 0`) are written to `abfss://silver@.../quarantine/`.
+2. Verify that data is written to `abfss://silver@<storage>.dfs.core.windows.net/`.
+3. Check `control.silver_execution_log` for success statuses.

@@ -31,14 +31,14 @@ RG=$(get resource_group_name)
 
 # canonical placeholder -> value (resource identifiers only; NO secrets)
 declare -A MAP=(
-  ["{{PLACEHOLDER_STORAGE_ACCOUNT}}"]="$STORAGE"
-  ["{{PLACEHOLDER_DATABRICKS_WORKSPACE_URL}}"]="$DBX"
-  ["{{PLACEHOLDER_KEY_VAULT_NAME}}"]="$KV_NAME"
-  ["{{PLACEHOLDER_KEY_VAULT_URI}}"]="$KV_URI"
-  ["{{PLACEHOLDER_SQL_SERVER_FQDN}}"]="$SQL_FQDN"
-  ["{{PLACEHOLDER_SQL_DATABASE}}"]="$SQL_DB"
-  ["{{PLACEHOLDER_DATA_FACTORY_NAME}}"]="$ADF"
-  ["{{PLACEHOLDER_RESOURCE_GROUP}}"]="$RG"
+  ["stdataplatformdevnda0jg"]="$STORAGE"
+  ["adb-7405616217745241.1.azuredatabricks.net"]="$DBX"
+  ["kvdataplatformdevnda0jg"]="$KV_NAME"
+  ["https://kvdataplatformdevnda0jg.vault.azure.net/"]="$KV_URI"
+  ["sql-dataplatform-dev-nda0jg.database.windows.net"]="$SQL_FQDN"
+  ["sqldb-control-dataplatform-dev"]="$SQL_DB"
+  ["adf-dataplatform-dev-nda0jg"]="$ADF"
+  ["rg-dataplatform-dev-centralindia"]="$RG"
 )
 
 echo "=== Binding placeholders across src/ and cicd/ ==="

@@ -1,227 +1,178 @@
 # Databricks notebook source
 # =================================================================================
-# SILVER LAYER TRANSFORMATION PIPELINE
+# SILVER LAYER TRANSFORMATION NOTEBOOK
 # =================================================================================
-# CRITICAL AUTH POLICY: Authentication is handled entirely by Unity Catalog via 
-# Managed Identity (Access Connector). NO fs.azure.* keys or secrets are set here.
-# The cluster simply reads/writes abfss:// paths authorized by External Locations.
+# (auth handled by Unity Catalog — see note above)
+# NEVER storage account keys, NEVER OAuth client secrets, NEVER plaintext passwords/tokens
+# Databricks -> ADLS is authorized by Unity Catalog (the Databricks Access Connector 
+# backs a UC Storage Credential + External Locations).
 # =================================================================================
 
 import json
-from pyspark.sql.functions import (
-    col, expr, current_timestamp, lit, row_number, when, array, array_remove, 
-    md5, concat_ws, coalesce
-)
+from pyspark.sql.functions import col, expr, current_timestamp, lit, md5, concat_ws, row_number
 from pyspark.sql.window import Window
 from delta.tables import DeltaTable
 
-# 1. Define and get widgets
+# 1. Define Widgets
 dbutils.widgets.text("pipeline_run_id", "")
 dbutils.widgets.text("silver_table_id", "")
-dbutils.widgets.text("source_bronze_path", "")
-dbutils.widgets.text("target_silver_path", "")
-dbutils.widgets.text("table_name", "")
+dbutils.widgets.text("source_system", "")
+dbutils.widgets.text("schema_name", "")
+dbutils.widgets.text("source_bronze_table", "")
+dbutils.widgets.text("target_silver_table", "")
 dbutils.widgets.text("primary_key_columns", "")
 dbutils.widgets.text("scd_type", "1")
+dbutils.widgets.text("track_history_columns", "")
 dbutils.widgets.text("partition_columns", "")
 dbutils.widgets.text("z_order_columns", "")
 dbutils.widgets.text("transformation_rules_json", "[]")
 dbutils.widgets.text("storage_account", "")
 
+# 2. Get Widget Values
 pipeline_run_id = dbutils.widgets.get("pipeline_run_id")
-source_bronze_path = dbutils.widgets.get("source_bronze_path")
-target_silver_path = dbutils.widgets.get("target_silver_path")
-table_name = dbutils.widgets.get("table_name")
-primary_key_columns = [k.strip() for k in dbutils.widgets.get("primary_key_columns").split(",")]
+source_system = dbutils.widgets.get("source_system")
+schema_name = dbutils.widgets.get("schema_name")
+source_bronze_table = dbutils.widgets.get("source_bronze_table")
+target_silver_table = dbutils.widgets.get("target_silver_table")
+primary_key_columns = dbutils.widgets.get("primary_key_columns").split(",")
 scd_type = int(dbutils.widgets.get("scd_type"))
-partition_columns = [p.strip() for p in dbutils.widgets.get("partition_columns").split(",") if p.strip()]
-z_order_columns = [z.strip() for z in dbutils.widgets.get("z_order_columns").split(",") if z.strip()]
+track_history_columns = dbutils.widgets.get("track_history_columns").split(",") if dbutils.widgets.get("track_history_columns") else []
+partition_columns = dbutils.widgets.get("partition_columns").split(",") if dbutils.widgets.get("partition_columns") else []
+z_order_columns = dbutils.widgets.get("z_order_columns").split(",") if dbutils.widgets.get("z_order_columns") else []
 transformation_rules = json.loads(dbutils.widgets.get("transformation_rules_json"))
 storage_account = dbutils.widgets.get("storage_account")
 
-# Construct full ABFSS paths
-bronze_uri = f"abfss://bronze@{storage_account}.dfs.core.windows.net/{source_bronze_path.replace('bronze/', '', 1)}"
-silver_uri = f"abfss://silver@{storage_account}.dfs.core.windows.net/{target_silver_path.replace('silver/', '', 1)}"
-quarantine_uri = f"abfss://silver@{storage_account}.dfs.core.windows.net/quarantine/{table_name}"
+# 3. Define Paths
+bronze_path = f"abfss://bronze@{storage_account}.dfs.core.windows.net/{source_system}/{schema_name}/{source_bronze_table}/"
+silver_path = f"abfss://silver@{storage_account}.dfs.core.windows.net/{source_system}/{schema_name}/{target_silver_table}/"
 
-print(f"Reading from: {bronze_uri}")
-print(f"Writing to: {silver_uri}")
+print(f"Reading from Bronze: {bronze_path}")
+print(f"Writing to Silver: {silver_path}")
 
-# 2. Read Bronze Data
-df_bronze = spark.read.format("delta").load(bronze_uri)
-records_read = df_bronze.count()
+# 4. Read Bronze Data
+try:
+    df_bronze = spark.read.format("delta").load(bronze_path)
+    records_read = df_bronze.count()
+except Exception as e:
+    print(f"Error reading Bronze path: {str(e)}")
+    raise e
 
 if records_read == 0:
-    dbutils.notebook.exit(json.dumps({
-        "records_read": 0, "records_written": 0, "records_filtered": 0, "records_quarantined": 0
-    }))
+    print("No records found in Bronze. Exiting gracefully.")
+    dbutils.notebook.exit(json.dumps({"records_read": 0, "records_written": 0}))
 
-# 3. Deduplication (Keep latest by event time / CDC version)
-# Approved Decision: source_primary_key + keep_latest_by_event_time
-order_col = "_cdc_version" if "_cdc_version" in df_bronze.columns else "LAST_UPDATE_DATE"
-if order_col not in df_bronze.columns:
-    order_col = "CREATED_DATE" # Fallback
+# 5. Deduplicate (Keep latest by event time / ingest timestamp)
+# Assuming Bronze has _ingest_timestamp or similar. If not, fallback to CDC version or just drop duplicates.
+if "_ingest_timestamp" in df_bronze.columns:
+    window_spec = Window.partitionBy(*[col(c) for c in primary_key_columns]).orderBy(col("_ingest_timestamp").desc())
+    df_dedup = df_bronze.withColumn("rn", row_number().over(window_spec)).filter(col("rn") == 1).drop("rn")
+else:
+    df_dedup = df_bronze.dropDuplicates(primary_key_columns)
 
-window_spec = Window.partitionBy(*[col(c) for c in primary_key_columns]).orderBy(col(order_col).desc())
-df_dedup = df_bronze.withColumn("_rn", row_number().over(window_spec)).filter(col("_rn") == 1).drop("_rn")
-
-# 4. Apply Dynamic Transformations
+# 6. Apply Transformations
 df_transformed = df_dedup
 for rule in transformation_rules:
-    r_type = rule.get("rule_type")
-    s_col = rule.get("source_column")
-    t_col = rule.get("target_column")
+    rule_type = rule.get("rule_type")
+    src_col = rule.get("source_column")
+    tgt_col = rule.get("target_column")
     expr_str = rule.get("transformation_expression")
     
-    if r_type == "CAST":
-        df_transformed = df_transformed.withColumn(t_col, col(s_col).cast(expr_str))
-    elif r_type == "TRANSFORM":
-        df_transformed = df_transformed.withColumn(t_col, expr(expr_str))
-    elif r_type == "RENAME":
-        df_transformed = df_transformed.withColumnRenamed(s_col, t_col)
-    elif r_type == "FILTER":
-        df_transformed = df_transformed.filter(expr(expr_str))
+    if rule_type == "CAST":
+        df_transformed = df_transformed.withColumn(tgt_col, col(src_col).cast(expr_str))
+    elif rule_type == "EXPRESSION":
+        df_transformed = df_transformed.withColumn(tgt_col, expr(expr_str))
+    elif rule_type == "RENAME":
+        df_transformed = df_transformed.withColumnRenamed(src_col, tgt_col)
 
-# Ensure all columns are snake_case (standardization)
-for c in df_transformed.columns:
-    if c.isupper():
-        df_transformed = df_transformed.withColumnRenamed(c, c.lower())
+# 7. Add Standard Metadata Columns
+df_transformed = df_transformed.withColumn("_pipeline_run_id", lit(pipeline_run_id)) \
+                               .withColumn("_load_timestamp", current_timestamp()) \
+                               .withColumn("_is_deleted", expr("CASE WHEN _cdc_operation = 'D' THEN true ELSE false END") if "_cdc_operation" in df_transformed.columns else lit(False))
 
-# 5. Apply Data Quality Rules (Approved Project Decisions)
-# Rule 1: TOTAL_AMOUNT > 0 (ERROR -> Quarantine)
-# Rule 2: CUSTOMER_ID IS NOT NULL (ERROR -> Quarantine)
-# Rule 3: STATUS IS NOT NULL (WARN -> Tag and keep)
-
-df_dq = df_transformed.withColumn("_dq_warnings", array())
-df_dq = df_dq.withColumn("_dq_failed", lit(False))
-df_dq = df_dq.withColumn("_dq_failure_reason", lit(""))
-
-# Apply Warn Rule
-if "status" in df_dq.columns:
-    df_dq = df_dq.withColumn(
-        "_dq_warnings",
-        when(col("status").isNull(), expr("array_append(_dq_warnings, 'STATUS IS NULL')")).otherwise(col("_dq_warnings"))
-    )
-
-# Apply Error Rules
-if "total_amount" in df_dq.columns:
-    df_dq = df_dq.withColumn(
-        "_dq_failed",
-        when((col("total_amount") <= 0) | col("total_amount").isNull(), lit(True)).otherwise(col("_dq_failed"))
-    ).withColumn(
-        "_dq_failure_reason",
-        when((col("total_amount") <= 0) | col("total_amount").isNull(), concat_ws(";", col("_dq_failure_reason"), lit("TOTAL_AMOUNT <= 0"))).otherwise(col("_dq_failure_reason"))
-    )
-
-if "customer_id" in df_dq.columns:
-    df_dq = df_dq.withColumn(
-        "_dq_failed",
-        when(col("customer_id").isNull(), lit(True)).otherwise(col("_dq_failed"))
-    ).withColumn(
-        "_dq_failure_reason",
-        when(col("customer_id").isNull(), concat_ws(";", col("_dq_failure_reason"), lit("CUSTOMER_ID IS NULL"))).otherwise(col("_dq_failure_reason"))
-    )
-
-# Split into valid and quarantine DataFrames
-df_quarantine = df_dq.filter(col("_dq_failed") == True)
-df_valid = df_dq.filter(col("_dq_failed") == False).drop("_dq_failed", "_dq_failure_reason")
-
-records_quarantined = df_quarantine.count()
-records_filtered = records_read - df_dedup.count()
-
-# Write Quarantined records
-if records_quarantined > 0:
-    df_quarantine.withColumn("_quarantine_timestamp", current_timestamp()) \
-                 .withColumn("_pipeline_run_id", lit(pipeline_run_id)) \
-                 .write.format("delta").mode("append").save(quarantine_uri)
-
-# 6. Add Silver Metadata Columns
-df_final = df_valid.withColumn("_pipeline_run_id", lit(pipeline_run_id)) \
-                   .withColumn("_load_timestamp", current_timestamp()) \
-                   .withColumn("_is_deleted", when(col("_cdc_operation") == 'D', lit(True)).otherwise(lit(False)))
-
-# 7. MERGE into Silver Delta Table
-if not DeltaTable.isDeltaTable(spark, silver_uri):
-    # Initial Load
+# 8. Write to Silver (Idempotent MERGE)
+if not DeltaTable.isDeltaTable(spark, silver_path):
     print("Target table does not exist. Performing initial load.")
-    if scd_type == 2:
-        df_final = df_final.withColumn("_is_current", lit(True)) \
-                           .withColumn("_valid_from", current_timestamp()) \
-                           .withColumn("_valid_to", lit(None).cast("timestamp"))
     
-    writer = df_final.write.format("delta").mode("overwrite")
-    if partition_columns:
+    if scd_type == 2:
+        df_transformed = df_transformed.withColumn("_valid_from", current_timestamp()) \
+                                       .withColumn("_valid_to", lit(None).cast("timestamp")) \
+                                       .withColumn("_is_current", lit(True)) \
+                                       .withColumn("_hash_key", md5(concat_ws("||", *[col(c) for c in track_history_columns])))
+    
+    writer = df_transformed.write.format("delta").mode("overwrite")
+    if partition_columns and partition_columns[0] != "":
         writer = writer.partitionBy(*partition_columns)
-    writer.save(silver_uri)
-    records_written = df_final.count()
+    writer.save(silver_path)
+    records_written = df_transformed.count()
+    
 else:
-    # Incremental MERGE
     print("Target table exists. Performing MERGE.")
-    target_table = DeltaTable.forPath(spark, silver_uri)
+    target_table = DeltaTable.forPath(spark, silver_path)
     
     # Build match condition
     match_cond = " AND ".join([f"target.{c} = source.{c}" for c in primary_key_columns])
     
     if scd_type == 1:
-        # SCD Type 1 (Overwrite)
+        # SCD Type 1: Overwrite
+        update_dict = {c: f"source.{c}" for c in df_transformed.columns}
+        
         target_table.alias("target").merge(
-            df_final.alias("source"),
+            df_transformed.alias("source"),
             match_cond
-        ).whenMatchedUpdateAll(
-        ).whenNotMatchedInsertAll(
+        ).whenMatchedUpdate(
+            set=update_dict
+        ).whenNotMatchedInsert(
+            values=update_dict
         ).execute()
         
     elif scd_type == 2:
-        # SCD Type 2 (History Tracking)
-        # Tracked columns for customers: status, customer_type, marketing_opt_in
-        tracked_cols = ["status", "customer_type", "marketing_opt_in"]
+        # SCD Type 2: History Tracking
+        df_transformed = df_transformed.withColumn("_hash_key", md5(concat_ws("||", *[col(c) for c in track_history_columns])))
         
-        # Generate hash for change detection
-        df_final = df_final.withColumn("_hash_key", md5(concat_ws("||", *[coalesce(col(c).cast("string"), lit("")) for c in tracked_cols])))
-        
-        # Identify records that need to be closed (Updates where hash changed)
-        staged_updates = df_final.alias("updates").join(
+        # Identify records that need to be closed (Hash changed)
+        staged_updates = df_transformed.alias("source").join(
             target_table.toDF().alias("target"),
-            expr(f"{match_cond} AND target._is_current = true AND target._hash_key != updates._hash_key")
-        ).selectExpr("updates.*", "true as _merge_update")
+            expr(f"{match_cond} AND target._is_current = true AND target._hash_key != source._hash_key")
+        ).selectExpr("source.*", "true as _merge_update")
         
-        # Identify new inserts (New records + New versions of updated records)
-        staged_inserts = df_final.withColumn("_merge_update", lit(False))
+        # Identify new records or unchanged records
+        staged_inserts = df_transformed.withColumn("_merge_update", lit(False))
         
-        # Union them for the MERGE source
+        # Union them for the merge
         staged_data = staged_updates.unionByName(staged_inserts)
         
-        # Execute SCD2 MERGE
+        insert_dict = {c: f"source.{c}" for c in df_transformed.columns}
+        insert_dict["_valid_from"] = "current_timestamp()"
+        insert_dict["_valid_to"] = "CAST(NULL AS TIMESTAMP)"
+        insert_dict["_is_current"] = "true"
+        
         target_table.alias("target").merge(
             staged_data.alias("source"),
-            f"{match_cond} AND target._is_current = true AND source._merge_update = true"
+            f"{match_cond} AND target._is_current = true"
         ).whenMatchedUpdate(
+            condition="source._merge_update = true",
             set={
-                "_is_current": lit(False),
-                "_valid_to": "source._load_timestamp",
-                "_last_modified_date": current_timestamp()
+                "_valid_to": "current_timestamp()",
+                "_is_current": "false",
+                "_pipeline_run_id": "source._pipeline_run_id"
             }
         ).whenNotMatchedInsert(
-            values={
-                **{c: f"source.{c}" for c in df_final.columns},
-                "_is_current": lit(True),
-                "_valid_from": "source._load_timestamp",
-                "_valid_to": lit(None).cast("timestamp")
-            }
+            values=insert_dict
         ).execute()
-        
-    records_written = df_final.count()
 
-# 8. Optimize and Z-Order
-if z_order_columns:
-    print(f"Optimizing table with Z-Order on: {', '.join(z_order_columns)}")
-    spark.sql(f"OPTIMIZE delta.`{silver_uri}` ZORDER BY ({', '.join(z_order_columns)})")
+    # Get metrics from Delta history
+    history = target_table.history(1).collect()[0]
+    metrics = history.operationMetrics
+    records_written = int(metrics.get("numTargetRowsInserted", 0)) + int(metrics.get("numTargetRowsUpdated", 0))
 
-# 9. Return Metrics
+# 9. Optimize and Z-Order
+if z_order_columns and z_order_columns[0] != "":
+    print(f"Optimizing and Z-Ordering by: {z_order_columns}")
+    spark.sql(f"OPTIMIZE delta.`{silver_path}` ZORDER BY ({','.join(z_order_columns)})")
+
+# 10. Return Metrics
 result = {
     "records_read": records_read,
-    "records_written": records_written,
-    "records_filtered": records_filtered,
-    "records_quarantined": records_quarantined
+    "records_written": records_written
 }
 dbutils.notebook.exit(json.dumps(result))

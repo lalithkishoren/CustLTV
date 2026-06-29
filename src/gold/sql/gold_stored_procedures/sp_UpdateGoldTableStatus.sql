@@ -1,4 +1,4 @@
-CREATE PROCEDURE [control].[sp_UpdateGoldTableStatus]
+CREATE OR ALTER PROCEDURE [control].[sp_UpdateGoldTableStatus]
     @GoldTableId INT,
     @Status VARCHAR(50),
     @PipelineRunId VARCHAR(100),

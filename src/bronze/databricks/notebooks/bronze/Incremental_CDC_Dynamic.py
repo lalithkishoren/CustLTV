@@ -1,27 +1,25 @@
-# Databricks notebook source
 # ===============================================================================
-# Incremental_CDC_Dynamic.py
-# PURPOSE: Apply CDC changes using MERGE from Staging (Parquet) to Bronze (Delta)
+# Incremental CDC Processing (Parquet Staging -> Delta MERGE)
 # ===============================================================================
 
-import pyodbc
 from pyspark.sql.functions import current_timestamp, lit, col, row_number
 from pyspark.sql.window import Window
 from delta.tables import DeltaTable
+import json
 
 # 1. Define Widgets
-dbutils.widgets.text("pipeline_run_id", "", "Pipeline Run ID")
-dbutils.widgets.text("table_id", "", "Table ID")
-dbutils.widgets.text("source_system", "", "Source System")
-dbutils.widgets.text("schema_name", "", "Schema Name")
-dbutils.widgets.text("table_name", "", "Table Name")
-dbutils.widgets.text("primary_key_columns", "", "Primary Key Columns")
-dbutils.widgets.text("last_sync_version", "", "Last Sync Version")
-dbutils.widgets.text("storage_account", "{{PLACEHOLDER_STORAGE_ACCOUNT}}", "Storage Account")
-dbutils.widgets.text("sql_server", "{{PLACEHOLDER_SQL_SERVER_FQDN}}", "SQL Server")
-dbutils.widgets.text("sql_database", "{{PLACEHOLDER_SQL_DATABASE}}", "SQL Database")
-dbutils.widgets.text("sql_username", "{{PLACEHOLDER_SQL_USERNAME}}", "SQL Username")
-dbutils.widgets.text("sql_password", "{{PLACEHOLDER_SQL_PASSWORD}}", "SQL Password")
+dbutils.widgets.text("pipeline_run_id", "")
+dbutils.widgets.text("table_id", "")
+dbutils.widgets.text("source_system", "")
+dbutils.widgets.text("schema_name", "")
+dbutils.widgets.text("table_name", "")
+dbutils.widgets.text("primary_key_columns", "")
+dbutils.widgets.text("last_sync_version", "")
+dbutils.widgets.text("storage_account", "")
+dbutils.widgets.text("sql_server", "")
+dbutils.widgets.text("sql_database", "")
+dbutils.widgets.text("sql_username", "")
+dbutils.widgets.text("sql_password", "")
 
 # 2. Get Widget Values
 pipeline_run_id = dbutils.widgets.get("pipeline_run_id")
@@ -37,105 +35,103 @@ sql_database = dbutils.widgets.get("sql_database")
 sql_username = dbutils.widgets.get("sql_username")
 sql_password = dbutils.widgets.get("sql_password")
 
-# ADLS auth: handled by Unity Catalog (NO account key, NO fs.azure.* auth)
+# ADLS auth: handled by Unity Catalog (NO account key, NO fs.azure.* configs)
 
 # 3. Define Paths
 staging_path = f"abfss://bronze@{storage_account}.dfs.core.windows.net/staging/{source_system}/{schema_name}/{table_name}/incremental/{pipeline_run_id}/"
 delta_path = f"abfss://bronze@{storage_account}.dfs.core.windows.net/{source_system}/{schema_name}/{table_name}/"
 
-# 4. Read CDC changes from Staging
-try:
-    cdc_df = spark.read.format("parquet").load(staging_path)
-    records_processed = cdc_df.count()
-    if records_processed == 0:
-        dbutils.notebook.exit('{"status": "SUCCESS", "records_loaded": 0}')
-except Exception as e:
-    raise Exception(f"Failed to read staging data: {str(e)}")
+print(f"Reading CDC from staging: {staging_path}")
+print(f"Merging into Delta: {delta_path}")
 
-# Extract new sync version from the first row (injected by sp_GetCDCChanges)
-new_sync_version = str(cdc_df.select("_current_sync_version").first()[0])
+# 4. Read Staging Parquet
+source_df = spark.read.format("parquet").load(staging_path)
+records_processed = source_df.count()
+print(f"Records read from staging: {records_processed}")
 
-# 5. Add Metadata Columns
-source_df = cdc_df \
-    .withColumn("_pipeline_run_id", lit(pipeline_run_id)) \
-    .withColumn("_ingest_timestamp", current_timestamp()) \
-    .withColumn("_source_system", lit(source_system)) \
-    .withColumn("_cdc_operation", col("SYS_CHANGE_OPERATION"))
+if records_processed == 0:
+    dbutils.notebook.exit(json.dumps({"status": "SUCCESS", "records_processed": 0}))
 
-# 6. Pre-MERGE Deduplication (CRITICAL)
+# Extract new sync version
+current_sync_version = str(source_df.agg({"_current_sync_version": "max"}).collect()[0][0])
+
+# 5. Deduplicate Source Data (Keep latest change per key)
 pk_cols = [pk.strip() for pk in primary_key_columns.split(',')]
-
-# Validate PK columns exist
-for pk in pk_cols:
-    if pk not in source_df.columns:
-        raise Exception(f"Primary key column {pk} not found in source dataframe.")
-
 window_spec = Window.partitionBy(*pk_cols).orderBy(col("SYS_CHANGE_VERSION").desc())
 
 source_deduped = source_df.withColumn("row_num", row_number().over(window_spec)) \
                           .filter(col("row_num") == 1) \
                           .drop("row_num")
 
-# 7. Read existing DELTA TABLE for MERGE
-if not DeltaTable.isDeltaTable(spark, delta_path):
-    raise Exception(f"Target Delta table does not exist at {delta_path}. Run Initial Load first.")
+# Add Audit/Metadata Columns
+source_deduped = source_deduped \
+    .withColumn("_pipeline_run_id", lit(pipeline_run_id)) \
+    .withColumn("_ingest_timestamp", current_timestamp()) \
+    .withColumn("_source_system", lit(source_system)) \
+    .withColumnRenamed("SYS_CHANGE_OPERATION", "_cdc_operation")
 
+# 6. Build Merge Condition
+merge_condition = " AND ".join([f"target.{pk} = source.{pk}" for pk in pk_cols])
+print(f"Merge Condition: {merge_condition}")
+
+# 7. Execute MERGE
 target_table = DeltaTable.forPath(spark, delta_path)
 
-# 8. Build merge condition dynamically
-merge_condition = " AND ".join([f"target.{pk} = source.{pk}" for pk in pk_cols])
-
-# Get columns for update/insert (exclude technical CDC columns)
-exclude_cols = ["SYS_CHANGE_OPERATION", "SYS_CHANGE_VERSION", "_current_sync_version"]
-all_columns = [c for c in source_deduped.columns if c not in exclude_cols]
-update_columns = [c for c in all_columns if c not in pk_cols]
-
-# 9. COMPLETE MERGE implementation
-print(f"Executing MERGE on {delta_path} with condition: {merge_condition}")
+# Get columns for update/insert (exclude PKs and system columns from update)
+all_columns = source_deduped.columns
+update_columns = [c for c in all_columns if c not in pk_cols and c not in ['SYS_CHANGE_VERSION', '_current_sync_version']]
 
 target_table.alias("target").merge(
     source_deduped.alias("source"),
     merge_condition
 ).whenMatchedDelete(
-    condition="source.SYS_CHANGE_OPERATION = 'D'"
+    condition="source._cdc_operation = 'D'"
 ).whenMatchedUpdate(
-    condition="source.SYS_CHANGE_OPERATION IN ('U', 'I')",
+    condition="source._cdc_operation IN ('U', 'I')",
     set={column: f"source.{column}" for column in update_columns}
 ).whenNotMatchedInsert(
-    condition="source.SYS_CHANGE_OPERATION != 'D'",
+    condition="source._cdc_operation != 'D'",
     values={column: f"source.{column}" for column in all_columns}
 ).execute()
 
-# 10. POST-MERGE Optimization (CRITICAL for performance)
+print("MERGE executed successfully.")
+
+# 8. OPTIMIZE Z-ORDER
 print(f"Optimizing Delta table: {delta_path}")
 spark.sql(f"""
     OPTIMIZE delta.`{delta_path}`
     ZORDER BY ({primary_key_columns}, _ingest_timestamp)
 """)
 
-# 11. Update Control Table via pyodbc
-conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={sql_server};DATABASE={sql_database};UID={sql_username};PWD={sql_password}"
+# 9. Update SQL Control Table via JDBC
+jdbc_url = f"jdbc:sqlserver://{sql_server}:1433;database={sql_database};encrypt=true;trustServerCertificate=false;hostNameInCertificate=*.database.windows.net;loginTimeout=30;"
+connection_properties = {
+    "user": sql_username,
+    "password": sql_password,
+    "driver": "com.microsoft.sqlserver.jdbc.SQLServerDriver"
+}
 
-try:
-    conn = pyodbc.connect(conn_str)
-    cursor = conn.cursor()
-    
-    update_sql = """
-        EXEC control.sp_UpdateTableMetadata 
-            @TableId = ?, 
-            @Status = 'SUCCESS', 
-            @PipelineRunId = ?, 
-            @RecordsLoaded = ?, 
-            @SyncVersion = ?, 
-            @MarkInitialLoadComplete = 0
-    """
-    cursor.execute(update_sql, (table_id, pipeline_run_id, records_processed, new_sync_version))
-    conn.commit()
-    cursor.close()
-    conn.close()
-    print("Successfully updated control database.")
-except Exception as e:
-    raise Exception(f"Failed to update control database: {str(e)}")
+update_query = f"""
+    EXEC control.sp_UpdateTableMetadata 
+        @TableId = {table_id}, 
+        @Status = 'SUCCESS', 
+        @PipelineRunId = '{pipeline_run_id}', 
+        @RecordsLoaded = {records_processed}, 
+        @SyncVersion = '{current_sync_version}', 
+        @MarkInitialLoadComplete = 0
+"""
 
-# 12. Return Status
-dbutils.notebook.exit(f'{{"status": "SUCCESS", "records_processed": {records_processed}, "new_sync_version": "{new_sync_version}"}}')
+spark.read.jdbc(url=jdbc_url, table=f"({update_query}) AS tmp", properties=connection_properties)
+print(f"Control table updated successfully. New sync version: {current_sync_version}")
+
+# 10. Clean up staging files
+dbutils.fs.rm(staging_path, recurse=True)
+print(f"Cleaned up staging path: {staging_path}")
+
+# 11. Return Status
+result = {
+    "status": "SUCCESS",
+    "records_processed": records_processed,
+    "sync_version": current_sync_version
+}
+dbutils.notebook.exit(json.dumps(result))

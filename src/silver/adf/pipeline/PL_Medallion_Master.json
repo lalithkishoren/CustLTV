@@ -14,7 +14,7 @@
                     },
                     "ifTrueActivities": [
                         {
-                            "name": "Run_Bronze_Orchestrator",
+                            "name": "Call_Bronze_Orchestrator",
                             "type": "ExecutePipeline",
                             "dependsOn": [],
                             "userProperties": [],
@@ -55,7 +55,7 @@
                     },
                     "ifTrueActivities": [
                         {
-                            "name": "Run_Silver_Orchestrator",
+                            "name": "Call_Silver_Orchestrator",
                             "type": "ExecutePipeline",
                             "dependsOn": [],
                             "userProperties": [],
