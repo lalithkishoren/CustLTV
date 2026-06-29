@@ -1,0 +1,33 @@
+{
+    "name": "PL_Medallion_Master",
+    "properties": {
+        "activities": [
+            {
+                "name": "Execute_Bronze_Pipeline",
+                "type": "ExecutePipeline",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                    "pipeline": {
+                        "referenceName": "PL_Bronze_Orchestrator",
+                        "type": "PipelineReference"
+                    },
+                    "waitOnCompletion": true,
+                    "parameters": {
+                        "pipeline_run_id": {
+                            "value": "@pipeline().RunId",
+                            "type": "Expression"
+                        }
+                    }
+                }
+            }
+        ],
+        "parameters": {
+            "pipeline_run_id": {
+                "type": "string",
+                "defaultValue": "@pipeline().RunId"
+            }
+        },
+        "annotations": []
+    }
+}

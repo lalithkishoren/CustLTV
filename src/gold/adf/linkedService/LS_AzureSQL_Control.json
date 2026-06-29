@@ -1,0 +1,11 @@
+{
+    "name": "LS_AzureSQL_Control",
+    "properties": {
+        "type": "AzureSqlDatabase",
+        "typeProperties": {
+            "connectionString": "Integrated Security=False;Encrypt=True;Connection Timeout=30;Data Source={{PLACEHOLDER_SQL_SERVER_FQDN}};Initial Catalog={{PLACEHOLDER_SQL_DATABASE}}"
+        },
+        "annotations": [],
+        "description": "Linked service for Azure SQL Control DB using Managed Identity"
+    }
+}

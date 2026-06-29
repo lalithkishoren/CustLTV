@@ -1,0 +1,24 @@
+semantic_models:
+  - name: sm_dim_campaign
+    description: "Semantic model representing marketing campaigns and their associated costs."
+    node_relation:
+      schema_name: gold
+      alias: dim_campaign
+    
+    entities:
+      - name: campaign
+        type: primary
+        expr: campaign_id
+
+    dimensions:
+      - name: campaign_name
+        type: categorical
+      - name: channel
+        type: categorical
+        description: "Marketing channel (e.g., Organic, Paid Social, Email)."
+
+    measures:
+      - name: campaign_acquisition_cost
+        description: "Customer acquisition cost (CAC) associated with the campaign."
+        agg: max
+        expr: acquisition_cost

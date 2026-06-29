@@ -1,0 +1,28 @@
+semantic_models:
+  - name: sm_dim_customer
+    description: "Semantic model representing the conformed customer dimension, including SCD Type 2 historical tracking."
+    node_relation:
+      schema_name: gold
+      alias: dim_customer
+    
+    entities:
+      - name: customer
+        type: primary
+        expr: customer_id
+
+    dimensions:
+      - name: rfm_segment
+        type: categorical
+        description: "Pre-calculated Recency, Frequency, Monetary segment."
+      - name: churn_status
+        type: categorical
+        description: "Current churn status of the customer."
+      - name: is_current
+        type: categorical
+        expr: _is_current
+        description: "SCD Type 2 flag indicating the active record."
+      - name: valid_from
+        type: time
+        expr: _valid_from
+        type_params:
+          time_granularity: day

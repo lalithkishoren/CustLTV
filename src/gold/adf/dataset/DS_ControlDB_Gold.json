@@ -1,0 +1,16 @@
+{
+    "name": "DS_ControlDB_Gold",
+    "properties": {
+        "linkedServiceName": {
+            "referenceName": "LS_AzureSQL_Control",
+            "type": "LinkedServiceReference"
+        },
+        "type": "AzureSqlTable",
+        "schema": [],
+        "typeProperties": {
+            "schema": "control",
+            "table": "gold_table_config"
+        },
+        "annotations": []
+    }
+}

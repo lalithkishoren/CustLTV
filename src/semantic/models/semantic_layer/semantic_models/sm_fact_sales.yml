@@ -1,0 +1,51 @@
+semantic_models:
+  - name: sm_fact_sales
+    description: "Semantic model representing the sales business process at the order line grain. Sourced from the Gold layer."
+    node_relation:
+      schema_name: gold
+      alias: fact_sales
+    
+    entities:
+      - name: order_line
+        type: primary
+        expr: order_line_id
+      - name: order
+        type: foreign
+        expr: order_id
+      - name: customer
+        type: foreign
+        expr: customer_id
+      - name: campaign
+        type: foreign
+        expr: campaign_id
+      - name: product
+        type: foreign
+        expr: product_id
+      - name: location
+        type: foreign
+        expr: location_id
+
+    dimensions:
+      - name: order_date
+        type: time
+        type_params:
+          time_granularity: day
+      - name: order_status
+        type: categorical
+        description: "Current status of the order (e.g., Delivered, Shipped). Cancelled/Returned are filtered in Silver."
+
+    measures:
+      - name: total_sales_amount
+        description: "Sum of line total revenue."
+        agg: sum
+        expr: line_total
+      
+      - name: order_count
+        description: "Count of distinct orders."
+        agg: count_distinct
+        expr: order_id
+      
+      - name: customer_tenure_months
+        description: "Maximum months elapsed since the order date. Mathematically equivalent to DATEDIFF from MIN(order_date) to CURRENT_DATE."
+        agg: max
+        expr: DATEDIFF(MONTH, order_date, CURRENT_DATE())

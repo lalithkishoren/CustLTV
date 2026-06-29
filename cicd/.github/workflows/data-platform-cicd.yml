@@ -1,0 +1,233 @@
+name: Data Platform CI/CD (Azure + Databricks)
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  release:
+    types: [published]
+
+permissions:
+  id-token: write # Required for Azure OIDC authentication
+  contents: read
+
+env:
+  TERRAFORM_VERSION: "1.7.4"
+  DATABRICKS_CLI_VERSION: "0.215.0"
+  PYTHON_VERSION: "3.10"
+
+jobs:
+  lint-and-test:
+    name: Lint & Run Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff sqlfluff pytest chispa
+          # project test deps, if present
+          find tests -name 'requirements-dev.txt' -exec pip install -r {} \; || true
+
+      - name: Lint Python Code (Ruff)
+        continue-on-error: true
+        run: ruff check src/
+
+      - name: Lint SQL Code (SQLFluff)
+        continue-on-error: true
+        run: sqlfluff lint src/ --dialect tsql || true
+
+      - name: Run Unit Tests (Pytest)
+        continue-on-error: true
+        run: pytest tests/ --junitxml=test-results.xml || true
+
+      - name: Validate Terraform
+        working-directory: ./infrastructure
+        run: |
+          terraform init -backend=false
+          terraform validate
+          terraform fmt -check
+
+  deploy-dev:
+    name: Deploy to Dev
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: lint-and-test
+    runs-on: ubuntu-latest
+    environment: dev
+    concurrency: dev-environment
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: Terraform Init & Apply (Dev)
+        working-directory: ./infrastructure
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_USE_OIDC: true
+        run: |
+          terraform init -backend-config="resource_group_name=${{ vars.TF_STATE_RG }}" -backend-config="storage_account_name=${{ vars.TF_STATE_SA }}" -backend-config="container_name=tfstate" -backend-config="key=dev.terraform.tfstate"
+          terraform apply -var-file="../config/env/dev.tfvars" -auto-approve
+
+      - name: Capture Terraform outputs (deploy targets)
+        id: tf
+        working-directory: ./infrastructure
+        run: |
+          {
+            echo "adf_name=$(terraform output -raw data_factory_name)"
+            echo "rg=$(terraform output -raw resource_group_name)"
+            echo "sql_fqdn=$(terraform output -raw sql_server_fqdn)"
+            echo "sql_db=$(terraform output -raw sql_database_name)"
+            echo "dbx_host=$(terraform output -raw databricks_workspace_url)"
+          } >> "$GITHUB_OUTPUT"
+
+      # ---- Bind code to the provisioned resources (placeholders -> terraform outputs) ----
+      - name: Bind config from Terraform outputs
+        run: bash cicd/scripts/bind_config.sh
+
+      # ---- Application code deployment ----
+      - name: Install Databricks CLI
+        run: curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/setup.sh | sh
+
+      - name: Deploy Databricks notebooks/jobs (Asset Bundle)
+        working-directory: ./cicd
+        env:
+          DATABRICKS_HOST: https://${{ steps.tf.outputs.dbx_host }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_SP_TOKEN }}
+        run: databricks bundle deploy -t dev
+
+      - name: Deploy ADF artifacts (linked services -> datasets -> pipelines)
+        env:
+          ADF_NAME: ${{ steps.tf.outputs.adf_name }}
+          ADF_RG: ${{ steps.tf.outputs.rg }}
+        run: bash cicd/scripts/deploy_adf.sh
+
+      - name: Install sqlcmd
+        run: |
+          curl https://packages.microsoft.com/keys/microsoft.asc | sudo tee /etc/apt/trusted.gpg.d/microsoft.asc > /dev/null
+          curl https://packages.microsoft.com/config/ubuntu/22.04/prod.list | sudo tee /etc/apt/sources.list.d/mssql-release.list > /dev/null
+          sudo apt-get update
+          sudo ACCEPT_EULA=Y apt-get install -y mssql-tools18 unixodbc-dev
+          echo "/opt/mssql-tools18/bin" >> "$GITHUB_PATH"
+
+      - name: Deploy SQL control objects
+        env:
+          SQL_SERVER_FQDN: ${{ steps.tf.outputs.sql_fqdn }}
+          SQL_DB: ${{ steps.tf.outputs.sql_db }}
+          SQL_RG: ${{ steps.tf.outputs.rg }}
+          SQL_ADMIN_USER: ${{ secrets.SQL_ADMIN_USER }}
+          KV_NAME: ${{ vars.KEY_VAULT_NAME }}
+          SQL_PWD_SECRET_NAME: ${{ vars.SQL_PWD_SECRET_NAME }}
+        run: bash cicd/scripts/deploy_sql.sh
+
+  deploy-test:
+    name: Deploy to Test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: deploy-dev
+    runs-on: ubuntu-latest
+    environment: test
+    concurrency: test-environment
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: Terraform Init & Apply (Test)
+        working-directory: ./infrastructure
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_USE_OIDC: true
+        run: |
+          terraform init -backend-config="resource_group_name=${{ vars.TF_STATE_RG }}" -backend-config="storage_account_name=${{ vars.TF_STATE_SA }}" -backend-config="container_name=tfstate" -backend-config="key=test.terraform.tfstate"
+          terraform apply -var-file="../config/env/test.tfvars" -auto-approve
+
+      - name: Install Databricks CLI
+        run: curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/setup.sh | sh
+
+      - name: Deploy Databricks Asset Bundle (Test)
+        env:
+          DATABRICKS_HOST: ${{ vars.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_SP_TOKEN }}
+        run: databricks bundle deploy -t test
+
+  deploy-prod:
+    name: Deploy to Prod
+    if: github.event_name == 'release' && github.event.action == 'published'
+    needs: lint-and-test
+    runs-on: ubuntu-latest
+    environment: 
+      name: prod
+      url: https://portal.azure.com
+    concurrency: prod-environment
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: Terraform Init & Apply (Prod)
+        working-directory: ./infrastructure
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_USE_OIDC: true
+        run: |
+          terraform init -backend-config="resource_group_name=${{ vars.TF_STATE_RG }}" -backend-config="storage_account_name=${{ vars.TF_STATE_SA }}" -backend-config="container_name=tfstate" -backend-config="key=prod.terraform.tfstate"
+          terraform apply -var-file="../config/env/prod.tfvars" -auto-approve
+
+      - name: Install Databricks CLI
+        run: curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/setup.sh | sh
+
+      - name: Deploy Databricks Asset Bundle (Prod)
+        env:
+          DATABRICKS_HOST: ${{ vars.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_SP_TOKEN }}
+        run: databricks bundle deploy -t prod

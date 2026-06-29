@@ -1,0 +1,52 @@
+{
+  "classification_framework": {
+    "levels": [
+      {
+        "tag": "Public",
+        "description": "Non-sensitive data, safe for broad internal consumption."
+      },
+      {
+        "tag": "Confidential",
+        "description": "Business sensitive data (financials, KPIs). Restricted to authorized roles."
+      },
+      {
+        "tag": "Restricted_PII",
+        "description": "Personally Identifiable Information. Must be masked for non-privileged users."
+      }
+    ]
+  },
+  "data_map": [
+    {
+      "domain": "crm",
+      "table": "customers",
+      "columns": [
+        { "name": "customer_id", "classification": "Public" },
+        { "name": "first_name", "classification": "Restricted_PII", "masking_type": "string_mask" },
+        { "name": "last_name", "classification": "Restricted_PII", "masking_type": "string_mask" },
+        { "name": "email", "classification": "Restricted_PII", "masking_type": "email_mask" },
+        { "name": "phone_number", "classification": "Restricted_PII", "masking_type": "string_mask" },
+        { "name": "status", "classification": "Public" }
+      ]
+    },
+    {
+      "domain": "erp",
+      "table": "addresses",
+      "columns": [
+        { "name": "address_id", "classification": "Public" },
+        { "name": "street_address", "classification": "Restricted_PII", "masking_type": "string_mask" },
+        { "name": "postal_code", "classification": "Restricted_PII", "masking_type": "string_mask" },
+        { "name": "city_id", "classification": "Public" }
+      ]
+    },
+    {
+      "domain": "erp",
+      "table": "oe_order_headers_all",
+      "columns": [
+        { "name": "order_id", "classification": "Public" },
+        { "name": "customer_id", "classification": "Public" },
+        { "name": "total_amount", "classification": "Confidential" },
+        { "name": "order_date", "classification": "Public" }
+      ]
+    }
+  ]
+}

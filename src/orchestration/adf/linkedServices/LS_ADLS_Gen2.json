@@ -1,0 +1,10 @@
+{
+    "name": "LS_ADLS_Gen2",
+    "properties": {
+        "type": "AzureBlobFS",
+        "typeProperties": {
+            "url": "https://{{PLACEHOLDER_STORAGE_ACCOUNT}}.dfs.core.windows.net"
+        },
+        "description": "Managed Identity connection to ADLS Gen2 for ADF Copy Activities."
+    }
+}

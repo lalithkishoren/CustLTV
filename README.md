@@ -1,5 +1,9 @@
-# Customer Lifetime Value (CLV) Analytics - Bronze Layer
+# CustLifeTimeValue
 
-This repository contains the production-ready code for the Bronze layer of the CLV Analytics platform. It implements a metadata-driven, highly scalable Change Data Capture (CDC) pipeline using Azure Data Factory, Azure Databricks, and Delta Lake.
 
-## Architecture Overview
+
+- Platform: Azure
+- Created: 2026-06-24T01:57:32.308090+00:00
+
+Modern Data Engineering project scaffolded by Ascend AI.
+Structure: docs/ (requirements, blueprint, design, contracts, runbooks), src/ (bronze/silver/gold, orchestration, semantic, governance), tests/, cicd/, artifacts/.

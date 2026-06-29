@@ -1,0 +1,270 @@
+{
+  "schema_version": 1,
+  "kb_version": "1.1.0",
+  "session_id": "a43e9f5e-263a-43e5-8f9d-832aa86e8fc7",
+  "created_at": "2026-06-25T03:17:56.392234+00:00",
+  "updated_at": "2026-06-29T04:26:14.928424+00:00",
+  "project": {},
+  "platform": "azure",
+  "layers": {
+    "bronze": {
+      "status": "tested",
+      "decisions": {},
+      "advisor_recommendation": {
+        "decisions": {
+          "freshness_sla": "hourly",
+          "ingestion_pattern": "incremental",
+          "snapshot_or_cdc": "cdc_events",
+          "late_arriving_policy": "lookback_window",
+          "delete_capture": "periodic_full_reconcile",
+          "schema_evolution": "allow_additive"
+        },
+        "rationales": {
+          "freshness_sla": "Hourly batching provides sufficient freshness for CLV and churn analytics while keeping ADF and Databricks compute costs significantly lower than always-on streaming.",
+          "ingestion_pattern": "Incremental loading minimizes cost and source system impact for large ERP/CRM tables; guardrail: requires robust watermark tracking in the Control DB and explicit delete handling.",
+          "snapshot_or_cdc": "Leveraging CDC events or watermarks avoids the massive rewrite amplification and cost of daily full snapshots on large transaction tables.",
+          "late_arriving_policy": "A lookback window on the watermark catches delayed source database commits that would otherwise be silently dropped in incremental JDBC loads.",
+          "delete_capture": "Because watermark-based incremental loads make hard deletes invisible, a periodic full reconcile is the necessary guardrail to ensure GDPR compliance and CLV accuracy.",
+          "schema_evolution": "Allowing additive schema evolution prevents pipeline breakage on new source columns, deferring strict schema enforcement and data quality to the Silver layer."
+        },
+        "notes": "The primary tradeoff is between the low cost of watermark-based incremental loads and the complexity of capturing hard deletes. If Oracle ERP/CRM frequently hard-deletes records, the periodic full reconcile will become expensive at scale; consider pushing for true CDC (e.g., Debezium/GoldenGate emitting tombstone events) if delete latency becomes a business issue. Ensure the lookback window size aligns with the maximum expected transaction commit delay in the source systems."
+      },
+      "approved_by": "user",
+      "approved_at": "2026-06-27T07:18:35.916233+00:00",
+      "notes": "The primary tradeoff is between the low cost of watermark-based incremental loads and the complexity of capturing hard deletes. If Oracle ERP/CRM frequently hard-deletes records, the periodic full reconcile will become expensive at scale; consider pushing for true CDC (e.g., Debezium/GoldenGate emitting tombstone events) if delete latency becomes a business issue. Ensure the lookback window size aligns with the maximum expected transaction commit delay in the source systems.",
+      "version": 2,
+      "history": [
+        {
+          "status": "approved",
+          "at": "2026-06-25T03:21:19.847643+00:00",
+          "note": "Without specific source metadata, these defaults assume a standard Azure SQL source with Change Tracking enabled. If the source only provides daily snapshots, the human must change 'snapshot_or_cdc' to 'daily_snapshot' and implement a diff + TARGETED MERGE to avoid rewrite amplification. Ensure the lookback window aligns with the maximum expected delay of late-arriving source data."
+        },
+        {
+          "status": "tested",
+          "at": "2026-06-27T07:11:57.228905+00:00",
+          "note": "11 test files validated"
+        },
+        {
+          "status": "tested",
+          "at": "2026-06-27T07:13:20.863127+00:00",
+          "note": "11 test files validated"
+        },
+        {
+          "status": "approved",
+          "at": "2026-06-27T07:18:35.916250+00:00",
+          "note": "The primary tradeoff is between the low cost of watermark-based incremental loads and the complexity of capturing hard deletes. If Oracle ERP/CRM frequently hard-deletes records, the periodic full reconcile will become expensive at scale; consider pushing for true CDC (e.g., Debezium/GoldenGate emitting tombstone events) if delete latency becomes a business issue. Ensure the lookback window size aligns with the maximum expected transaction commit delay in the source systems."
+        },
+        {
+          "status": "tested",
+          "at": "2026-06-27T07:21:03.582122+00:00",
+          "note": "11 test files validated"
+        },
+        {
+          "status": "tested",
+          "at": "2026-06-27T07:22:22.743575+00:00",
+          "note": "7 test files generated"
+        }
+      ]
+    },
+    "silver": {
+      "status": "tested",
+      "decisions": {
+        "bad_row_policy": "quarantine",
+        "dedup_keys": "source_primary_key + keep_latest_by_event_time",
+        "dq_rules": [
+          {
+            "check": "TOTAL_AMOUNT > 0",
+            "severity": "error"
+          },
+          {
+            "check": "CUSTOMER_ID IS NOT NULL",
+            "severity": "error"
+          },
+          {
+            "check": "STATUS IS NOT NULL",
+            "severity": "warn"
+          }
+        ],
+        "null_handling": "leave",
+        "table_ownership": "one_writer_per_table"
+      },
+      "advisor_recommendation": {
+        "decisions": {
+          "bad_row_policy": "quarantine",
+          "dedup_keys": "source_primary_key + keep_latest_by_event_time",
+          "dq_rules": [
+            {
+              "check": "TOTAL_AMOUNT > 0",
+              "severity": "error"
+            },
+            {
+              "check": "CUSTOMER_ID IS NOT NULL",
+              "severity": "error"
+            },
+            {
+              "check": "STATUS IS NOT NULL",
+              "severity": "warn"
+            }
+          ],
+          "null_handling": "leave",
+          "table_ownership": "one_writer_per_table"
+        },
+        "rationales": {
+          "bad_row_policy": "Quarantining to a DLQ (silver.dq_exception_log) prioritizes pipeline freshness and completeness over immediate failure (tradeoff), with the failure mode being a silent DLQ buildup, assuming a guardrail of automated alerts on DLQ volume.",
+          "dedup_keys": "Deduplicating on source primary keys keeping the latest event time ensures idempotency and handles out-of-order CDC events (correctness vs complexity), with the failure mode being lost updates if timestamps are identical, assuming Bronze provides reliable CDC event timestamps.",
+          "dq_rules": "Enforcing strict errors on critical financial/relational fields prevents downstream corruption, while warning on non-critical fields maintains completeness (quality vs yield), with the failure mode being downstream logic breaking on unhandled warnings, assuming DLQ routing for errors.",
+          "null_handling": "Leaving non-critical nulls intact preserves source fidelity and avoids masking data issues (completeness vs complexity), with the failure mode being downstream Gold aggregations failing on nulls, assuming critical keys are handled via strict DQ 'error' rules.",
+          "table_ownership": "Enforcing a single Databricks DLT pipeline writer per Silver table prevents concurrent write conflicts and state corruption (reliability vs flexibility), with the failure mode being organizational bottlenecks, assuming strict RBAC via Unity Catalog."
+        },
+        "notes": "The human must weigh the operational overhead of managing the DLQ (quarantine) against the risk of dropping data. Additionally, SCD Type 2 on CRM.CUSTOMERS must strictly use event_time (not processing_time) to ensure historical accuracy for churn analysis, and partitioning on large transaction tables must use date-based keys (e.g., ORDER_DATE Year/Month) combined with Z-ordering to avoid small-file explosions."
+      },
+      "approved_by": "user",
+      "approved_at": "2026-06-27T07:10:51.111964+00:00",
+      "notes": "The human must weigh the operational overhead of managing the DLQ (quarantine) against the risk of dropping data. Additionally, SCD Type 2 on CRM.CUSTOMERS must strictly use event_time (not processing_time) to ensure historical accuracy for churn analysis, and partitioning on large transaction tables must use date-based keys (e.g., ORDER_DATE Year/Month) combined with Z-ordering to avoid small-file explosions.",
+      "version": 2,
+      "history": [
+        {
+          "status": "advised",
+          "at": "2026-06-27T06:50:42.823884+00:00",
+          "note": ""
+        },
+        {
+          "status": "approved",
+          "at": "2026-06-27T06:50:47.594126+00:00",
+          "note": "The human must weigh the operational overhead of managing the DLQ (quarantine) against the risk of dropping data. Additionally, SCD Type 2 on CRM.CUSTOMERS must strictly use event_time (not processing_time) to ensure historical accuracy for churn analysis, and partitioning on large transaction tables must use date-based keys (e.g., ORDER_DATE Year/Month) combined with Z-ordering to avoid small-file explosions."
+        },
+        {
+          "status": "generated",
+          "at": "2026-06-27T06:53:40.075415+00:00",
+          "note": "18 files generated"
+        },
+        {
+          "status": "tested",
+          "at": "2026-06-27T07:10:23.371579+00:00",
+          "note": "7 test files generated"
+        },
+        {
+          "status": "tested",
+          "at": "2026-06-27T07:10:35.781297+00:00",
+          "note": "7 test files validated"
+        },
+        {
+          "status": "approved",
+          "at": "2026-06-27T07:10:51.111978+00:00",
+          "note": "The human must weigh the operational overhead of managing the DLQ (quarantine) against the risk of dropping data. Additionally, SCD Type 2 on CRM.CUSTOMERS must strictly use event_time (not processing_time) to ensure historical accuracy for churn analysis, and partitioning on large transaction tables must use date-based keys (e.g., ORDER_DATE Year/Month) combined with Z-ordering to avoid small-file explosions."
+        },
+        {
+          "status": "tested",
+          "at": "2026-06-27T07:20:32.250499+00:00",
+          "note": "7 test files validated"
+        },
+        {
+          "status": "tested",
+          "at": "2026-06-27T07:21:32.560344+00:00",
+          "note": "7 test files generated"
+        }
+      ]
+    },
+    "gold": {
+      "status": "tested",
+      "decisions": {
+        "cdc_required": "yes",
+        "scd_type": "type_2",
+        "delete_handling": "explicit_marker",
+        "scd2_validity_basis": "event_time",
+        "business_partition_keys": "date_only",
+        "schema_contract_policy": "breaking_requires_signoff",
+        "kpis": [
+          {
+            "expression": "SUM(TOTAL_AMOUNT) / COUNT(DISTINCT ORDER_ID)",
+            "grain": "Customer/Monthly",
+            "name": "Average Order Value (AOV)"
+          },
+          {
+            "expression": "COUNT(DISTINCT ORDER_ID) / (DATEDIFF(day, MIN(ORDER_DATE), MAX(ORDER_DATE)) / 30.0)",
+            "grain": "Customer",
+            "name": "Purchase Frequency"
+          },
+          {
+            "expression": "SUM(TOTAL_SPEND) / NULLIF(SUM(CUSTOMERS_ACQUIRED), 0)",
+            "grain": "Campaign/Monthly",
+            "name": "Customer Acquisition Cost (CAC)"
+          }
+        ]
+      },
+      "advisor_recommendation": {
+        "decisions": {
+          "cdc_required": "yes",
+          "scd_type": "type_2",
+          "delete_handling": "explicit_marker",
+          "scd2_validity_basis": "event_time",
+          "business_partition_keys": "date_only",
+          "schema_contract_policy": "breaking_requires_signoff",
+          "kpis": [
+            {
+              "name": "Average Order Value (AOV)",
+              "expression": "SUM(TOTAL_AMOUNT) / COUNT(DISTINCT ORDER_ID)",
+              "grain": "Customer/Monthly"
+            },
+            {
+              "name": "Purchase Frequency",
+              "expression": "COUNT(DISTINCT ORDER_ID) / (DATEDIFF(day, MIN(ORDER_DATE), MAX(ORDER_DATE)) / 30.0)",
+              "grain": "Customer"
+            },
+            {
+              "name": "Customer Acquisition Cost (CAC)",
+              "expression": "SUM(TOTAL_SPEND) / NULLIF(SUM(CUSTOMERS_ACQUIRED), 0)",
+              "grain": "Campaign/Monthly"
+            }
+          ]
+        },
+        "rationales": {
+          "cdc_required": "Required to track historical changes in customer attributes (e.g., Churn Status) for accurate point-in-time CLV analytics; guardrail is ensuring Silver provides reliable CDC flags.",
+          "scd_type": "Type 2 is explicitly required for the Customer dimension to track churn history; tradeoff is increased storage/complexity vs. historical accuracy, assuming automated surrogate key generation.",
+          "delete_handling": "Snapshot-absence is invalid for incremental DLT loads; explicit markers ensure reliable hard/soft deletes without requiring full table scans, assuming source systems emit delete events.",
+          "scd2_validity_basis": "Event time guarantees accurate historical state even for late-arriving records; processing time would silently corrupt history, assuming source provides reliable update timestamps.",
+          "business_partition_keys": "Date-based partitioning (e.g., Order Date Year/Month) balances file size and query pruning; high-cardinality keys (Customer ID) must rely on Z-Ordering to prevent small-file explosions.",
+          "schema_contract_policy": "Gold is a strict interface for Power BI and ML consumers; dropping/renaming columns breaks downstream dashboards and requires formal governance sign-off.",
+          "kpis": "Pre-computing complex metrics at the aggregate grain ensures single-source-of-truth consistency across BI and ML, trading compute cost for read performance; guardrail is strict semantic layer governance."
+        },
+        "notes": "Human must verify that Oracle ERP/CRM sources reliably emit explicit delete markers and event timestamps for SCD2. Ensure Power BI DirectQuery performance meets SLAs with the chosen date partitioning and Z-ordering strategy."
+      },
+      "approved_by": "user",
+      "approved_at": "2026-06-27T06:51:38.203925+00:00",
+      "notes": "Human must verify that Oracle ERP/CRM sources reliably emit explicit delete markers and event timestamps for SCD2. Ensure Power BI DirectQuery performance meets SLAs with the chosen date partitioning and Z-ordering strategy.",
+      "version": 1,
+      "history": [
+        {
+          "status": "advised",
+          "at": "2026-06-27T06:51:32.356790+00:00",
+          "note": ""
+        },
+        {
+          "status": "approved",
+          "at": "2026-06-27T06:51:38.203943+00:00",
+          "note": "Human must verify that Oracle ERP/CRM sources reliably emit explicit delete markers and event timestamps for SCD2. Ensure Power BI DirectQuery performance meets SLAs with the chosen date partitioning and Z-ordering strategy."
+        },
+        {
+          "status": "generated",
+          "at": "2026-06-27T06:56:07.408051+00:00",
+          "note": "23 files generated"
+        },
+        {
+          "status": "tested",
+          "at": "2026-06-27T07:13:06.918056+00:00",
+          "note": "7 test files generated"
+        },
+        {
+          "status": "tested",
+          "at": "2026-06-27T07:19:40.340765+00:00",
+          "note": "7 test files validated"
+        },
+        {
+          "status": "tested",
+          "at": "2026-06-27T07:20:30.034353+00:00",
+          "note": "7 test files generated"
+        }
+      ]
+    }
+  }
+}

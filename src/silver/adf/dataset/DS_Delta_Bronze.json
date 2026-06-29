@@ -1,0 +1,25 @@
+{
+    "name": "DS_Delta_Bronze",
+    "properties": {
+        "linkedServiceName": {
+            "referenceName": "LS_AzureDataLakeStorage",
+            "type": "LinkedServiceReference"
+        },
+        "parameters": {
+            "bronze_path": {
+                "type": "string"
+            }
+        },
+        "type": "Delta",
+        "typeProperties": {
+            "location": {
+                "type": "AzureBlobFSLocation",
+                "folderPath": {
+                    "value": "@dataset().bronze_path",
+                    "type": "Expression"
+                },
+                "fileSystem": "bronze"
+            }
+        }
+    }
+}

@@ -1,0 +1,12 @@
+{
+    "name": "LS_Databricks",
+    "properties": {
+        "type": "AzureDatabricks",
+        "typeProperties": {
+            "domain": "https://{{PLACEHOLDER_DATABRICKS_WORKSPACE_URL}}",
+            "authentication": "ManagedIdentity",
+            "workspaceResourceId": "/subscriptions/@{pipeline().parameters.subscriptionId}/resourceGroups/{{PLACEHOLDER_RESOURCE_GROUP}}/providers/Microsoft.Databricks/workspaces/{{PLACEHOLDER_DATABRICKS_WORKSPACE_URL}}"
+        },
+        "description": "Managed Identity connection to Databricks Workspace for DLT orchestration."
+    }
+}

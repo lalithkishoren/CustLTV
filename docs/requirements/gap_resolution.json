@@ -1,0 +1,576 @@
+{
+  "gap_analysis": {
+    "analysis_id": "gap-analysis-20260624074601",
+    "overall_readiness": "READY_WITH_CLARIFICATIONS",
+    "coverage_score": 88,
+    "calculation": {
+      "exact_matches": 44,
+      "partial_matches": 7,
+      "not_found": 3,
+      "total_elements": 54,
+      "formula": "(((44 + 7*0.5) / 54) * 100) = 88 [recomputed server-side]"
+    },
+    "summary": {
+      "total_requirements": 25,
+      "total_elements_analyzed": 54,
+      "matched": 51,
+      "gaps_found": 8,
+      "blockers": 0,
+      "high": 2,
+      "medium": 4,
+      "low": 2
+    },
+    "element_inventory": [
+      "KPI: Customer Lifetime Value (CLV)",
+      "Metric: Average Order Value (AOV)",
+      "Metric: Purchase Frequency",
+      "Metric: Customer Lifespan",
+      "Metric: Customer Acquisition Cost (CAC)",
+      "Metric: Recency",
+      "Table: ERP.OE_ORDER_HEADERS_ALL",
+      "Table: CRM.CUSTOMERS",
+      "Table: MARKETING.MARKETING_CAMPAIGNS",
+      "Table: CRM.CUSTOMER_REGISTRATION_SOURCE",
+      "Table: ERP.CITY_TIER_MASTER",
+      "Table: CRM.SURVEYS",
+      "Table: CRM.INCIDENTS",
+      "Table: ERP.ADDRESSES",
+      "Column: OE_ORDER_HEADERS_ALL.TOTAL_AMOUNT",
+      "Column: OE_ORDER_HEADERS_ALL.ORDER_STATUS",
+      "Column: OE_ORDER_HEADERS_ALL.CUSTOMER_ID",
+      "Column: OE_ORDER_HEADERS_ALL.ORDER_DATE",
+      "Column: OE_ORDER_HEADERS_ALL.ORDER_ID",
+      "Column: CUSTOMERS.REGISTRATION_DATE",
+      "Column: CUSTOMERS.STATUS",
+      "Column: MARKETING_CAMPAIGNS.TOTAL_SPEND",
+      "Column: MARKETING_CAMPAIGNS.CUSTOMERS_ACQUIRED",
+      "Column: MARKETING_CAMPAIGNS.CAMPAIGN_ID",
+      "Column: CUSTOMER_REGISTRATION_SOURCE.CHANNEL",
+      "Column: CUSTOMER_REGISTRATION_SOURCE.CAMPAIGN_ID",
+      "Column: CITY_TIER_MASTER.CITY",
+      "Column: CITY_TIER_MASTER.STATE",
+      "Column: CITY_TIER_MASTER.TIER",
+      "Column: CITY_TIER_MASTER.COUNTRY",
+      "Column: CITY_TIER_MASTER.REGION",
+      "Column: CUSTOMERS.EMAIL",
+      "Column: CUSTOMERS.CUSTOMER_TYPE",
+      "Column: SURVEYS.NPS_SCORE",
+      "Column: SURVEYS.NPS_CATEGORY",
+      "Column: INCIDENTS.INCIDENT_ID",
+      "Column: INCIDENTS.CUSTOMER_ID",
+      "Dimension: Customer Segment",
+      "Dimension: Acquisition Channel",
+      "Dimension: Geographic Region",
+      "Dimension: Loyalty Tier",
+      "Dimension: Time",
+      "Dimension: Product Category",
+      "Rule: BR-001",
+      "Rule: BR-002",
+      "Rule: BR-003",
+      "Rule: BR-004",
+      "Rule: BR-005",
+      "Rule: BR-006",
+      "Rule: DQ-001",
+      "Rule: DQ-002",
+      "Rule: DQ-003",
+      "Rule: DQ-004",
+      "Rule: DQ-005"
+    ],
+    "gaps": [
+      {
+        "gap_id": "GAP-001",
+        "category": "MISSING_COLUMN",
+        "severity": "HIGH",
+        "requirement_reference": "Hierarchy: Country -> Region -> State -> City -> Tier",
+        "metadata_reference": "ERP.CITY_TIER_MASTER",
+        "description": "The Geographic Region dimension requires Country and Region levels, but the CITY_TIER_MASTER table only contains CITY, STATE, and TIER.",
+        "question_for_user": "Should Country and Region be derived from State, or is there another reference table for the full geographic hierarchy?",
+        "suggested_resolution": "Add Country and Region columns to CITY_TIER_MASTER or provide a mapping table.",
+        "status": "RESOLVED",
+        "user_response": "ignore country and region"
+      },
+      {
+        "gap_id": "GAP-002",
+        "category": "MISSING_SOURCE_TABLE",
+        "severity": "HIGH",
+        "requirement_reference": "Dimension: Time / Date ... Source System: Data Warehouse",
+        "metadata_reference": "N/A",
+        "description": "A conformed Time dimension is required for trend and cohort analysis, but no date/time master table is defined in the source metadata.",
+        "question_for_user": "Is there an existing Date/Time dimension in the Data Warehouse that can be used, or does it need to be generated?",
+        "suggested_resolution": "Generate a standard Date dimension table in the analytics layer with the required hierarchy (Year -> Quarter -> Month -> Week -> Day).",
+        "status": "RESOLVED",
+        "user_response": "Generate a standard Date dimension table in the analytics layer with the required hierarchy (Year -> Quarter -> Month -> Week -> Day)."
+      },
+      {
+        "gap_id": "GAP-003",
+        "category": "INCOMPLETE_FORMULA",
+        "severity": "MEDIUM",
+        "requirement_reference": "Purchase Frequency = COUNT(Orders) / DATEDIFF(MONTH, First_Order, Last_Order)",
+        "metadata_reference": "ERP.OE_ORDER_HEADERS_ALL.ORDER_DATE",
+        "description": "The formula references 'First_Order' and 'Last_Order' which are not explicit columns in the source tables.",
+        "question_for_user": "Should First_Order and Last_Order be calculated dynamically using MIN(ORDER_DATE) and MAX(ORDER_DATE) per customer?",
+        "suggested_resolution": "Update formula to explicitly use MIN() and MAX() aggregations on ORDER_DATE.",
+        "status": "RESOLVED",
+        "user_response": "use MIN() and MAX() aggregations on ORDER_DATE."
+      },
+      {
+        "gap_id": "GAP-004",
+        "category": "INCOMPLETE_FORMULA",
+        "severity": "MEDIUM",
+        "requirement_reference": "Customer Lifespan = DATEDIFF(MONTH, Registration_Date, Last_Activity_Date)",
+        "metadata_reference": "CRM.CUSTOMERS.REGISTRATION_DATE",
+        "description": "The formula references 'Last_Activity_Date' which is not an explicit column in the CUSTOMERS table.",
+        "question_for_user": "How should Last_Activity_Date be defined? Is it the MAX(ORDER_DATE) or does it include CRM interactions/logins?",
+        "suggested_resolution": "Define the exact derivation logic for Last_Activity_Date using available transaction or interaction dates.",
+        "status": "RESOLVED",
+        "user_response": "MAX(ORDER_DATE)"
+      },
+      {
+        "gap_id": "GAP-005",
+        "category": "MISSING_COLUMN",
+        "severity": "MEDIUM",
+        "requirement_reference": "BR-005: Customer lifespan ends at churn date or current date",
+        "metadata_reference": "CRM.CUSTOMERS.STATUS",
+        "description": "The business rule references a 'churn date' to cap customer lifespan, but no such column exists in the CUSTOMERS table.",
+        "question_for_user": "Is churn date recorded in another system, or should it be inferred based on the date the customer STATUS changed to 'Churned'?",
+        "suggested_resolution": "Implement logic to track the timestamp of STATUS changes to 'Churned' (e.g., using SCD Type 2 history).",
+        "status": "RESOLVED",
+        "user_response": "Implement logic to track the timestamp of STATUS changes to 'Churned' (e.g., using SCD Type 2 history)."
+      },
+      {
+        "gap_id": "GAP-006",
+        "category": "NAMING_DISCREPANCY",
+        "severity": "LOW",
+        "requirement_reference": "AOV Formula: SUM(Order Total) ... DQ-001: ORDER_TOTAL Must be > 0",
+        "metadata_reference": "ERP.OE_ORDER_HEADERS_ALL.TOTAL_AMOUNT",
+        "description": "Requirements refer to 'Order Total' and 'ORDER_TOTAL', but the physical column in the ERP system is named 'TOTAL_AMOUNT'.",
+        "question_for_user": "Can we confirm that TOTAL_AMOUNT is the correct column to use for Order Total?",
+        "suggested_resolution": "Map ORDER_TOTAL in requirements to TOTAL_AMOUNT in the physical implementation.",
+        "status": "RESOLVED",
+        "user_response": "TOTAL_AMOUNT is the correct column to use for Order Total"
+      },
+      {
+        "gap_id": "GAP-007",
+        "category": "NAMING_DISCREPANCY",
+        "severity": "LOW",
+        "requirement_reference": "CAC Formula: Campaign_Total_Spend / Customers_Acquired",
+        "metadata_reference": "MARKETING.MARKETING_CAMPAIGNS.TOTAL_SPEND",
+        "description": "The CAC formula refers to 'Campaign_Total_Spend', but the physical column is named 'TOTAL_SPEND'.",
+        "question_for_user": "Can we confirm that TOTAL_SPEND in the MARKETING_CAMPAIGNS table represents the Campaign_Total_Spend?",
+        "suggested_resolution": "Map Campaign_Total_Spend to TOTAL_SPEND.",
+        "status": "RESOLVED",
+        "user_response": "Map Campaign_Total_Spend to TOTAL_SPEND."
+      },
+      {
+        "gap_id": "GAP-008",
+        "category": "AMBIGUOUS_REQUIREMENT",
+        "severity": "MEDIUM",
+        "requirement_reference": "BR-004: Minimum 1 completed order for CLV calculation vs Segment 'New': 0 orders",
+        "metadata_reference": "N/A",
+        "description": "BR-004 states customers need at least 1 completed order for CLV calculation, but the RFM segmentation includes a 'New' segment with 0 orders and a 'Predicted' expected CLV.",
+        "question_for_user": "Should 'New' customers (0 orders) be included in the CLV pipeline with a predicted value, or excluded entirely as per BR-004?",
+        "suggested_resolution": "Clarify BR-004 to either exclude 'New' segment from CLV entirely, or specify that BR-004 only applies to historical CLV calculation, not predicted.",
+        "status": "RESOLVED",
+        "user_response": "'New' customers (0 orders) be included in the CLV pipeline with a predicted value"
+      }
+    ],
+    "mappings": [
+      {
+        "requirement_item": "KPI: Customer Lifetime Value (CLV)",
+        "metadata_match": "CLV Calculation Lineage",
+        "match_status": "EXACT",
+        "confidence": 1.0,
+        "notes": "All components available"
+      },
+      {
+        "requirement_item": "Metric: Average Order Value (AOV)",
+        "metadata_match": "TOTAL_AMOUNT",
+        "match_status": "PARTIAL",
+        "confidence": 0.8,
+        "notes": "Naming discrepancy: Order Total vs TOTAL_AMOUNT"
+      },
+      {
+        "requirement_item": "Metric: Purchase Frequency",
+        "metadata_match": "ORDER_DATE",
+        "match_status": "PARTIAL",
+        "confidence": 0.7,
+        "notes": "Missing explicit First_Order/Last_Order columns"
+      },
+      {
+        "requirement_item": "Metric: Customer Lifespan",
+        "metadata_match": "REGISTRATION_DATE, ORDER_DATE",
+        "match_status": "PARTIAL",
+        "confidence": 0.7,
+        "notes": "Missing explicit Last_Activity_Date column"
+      },
+      {
+        "requirement_item": "Metric: Customer Acquisition Cost (CAC)",
+        "metadata_match": "TOTAL_SPEND",
+        "match_status": "PARTIAL",
+        "confidence": 0.9,
+        "notes": "Naming discrepancy: Campaign_Total_Spend vs TOTAL_SPEND"
+      },
+      {
+        "requirement_item": "Metric: Recency",
+        "metadata_match": "ORDER_DATE",
+        "match_status": "EXACT",
+        "confidence": 1.0,
+        "notes": "Can be calculated from ORDER_DATE"
+      },
+      {
+        "requirement_item": "Table: ERP.OE_ORDER_HEADERS_ALL",
+        "metadata_match": "ERP.OE_ORDER_HEADERS_ALL",
+        "match_status": "EXACT",
+        "confidence": 1.0,
+        "notes": "Table exists"
+      },
+      {
+        "requirement_item": "Table: CRM.CUSTOMERS",
+        "metadata_match": "CRM.CUSTOMERS",
+        "match_status": "EXACT",
+        "confidence": 1.0,
+        "notes": "Table exists"
+      },
+      {
+        "requirement_item": "Table: MARKETING.MARKETING_CAMPAIGNS",
+        "metadata_match": "MARKETING.MARKETING_CAMPAIGNS",
+        "match_status": "EXACT",
+        "confidence": 1.0,
+        "notes": "Table exists"
+      },
+      {
+        "requirement_item": "Table: CRM.CUSTOMER_REGISTRATION_SOURCE",
+        "metadata_match": "CRM.CUSTOMER_REGISTRATION_SOURCE",
+        "match_status": "EXACT",
+        "confidence": 1.0,
+        "notes": "Table exists"
+      },
+      {
+        "requirement_item": "Table: ERP.CITY_TIER_MASTER",
+        "metadata_match": "ERP.CITY_TIER_MASTER",
+        "match_status": "EXACT",
+        "confidence": 1.0,
+        "notes": "Table exists"
+      },
+      {
+        "requirement_item": "Table: CRM.SURVEYS",
+        "metadata_match": "CRM.SURVEYS",
+        "match_status": "EXACT",
+        "confidence": 1.0,
+        "notes": "Table exists"
+      },
+      {
+        "requirement_item": "Table: CRM.INCIDENTS",
+        "metadata_match": "CRM.INCIDENTS",
+        "match_status": "EXACT",
+        "confidence": 1.0,
+        "notes": "Table exists"
+      },
+      {
+        "requirement_item": "Table: ERP.ADDRESSES",
+        "metadata_match": "ERP.ADDRESSES",
+        "match_status": "EXACT",
+        "confidence": 1.0,
+        "notes": "Table exists"
+      },
+      {
+        "requirement_item": "Column: OE_ORDER_HEADERS_ALL.TOTAL_AMOUNT",
+        "metadata_match": "TOTAL_AMOUNT",
+        "match_status": "EXACT",
+        "confidence": 1.0,
+        "notes": "Column exists"
+      },
+      {
+        "requirement_item": "Column: OE_ORDER_HEADERS_ALL.ORDER_STATUS",
+        "metadata_match": "ORDER_STATUS",
+        "match_status": "EXACT",
+        "confidence": 1.0,
+        "notes": "Column exists"
+      },
+      {
+        "requirement_item": "Column: OE_ORDER_HEADERS_ALL.CUSTOMER_ID",
+        "metadata_match": "CUSTOMER_ID",
+        "match_status": "EXACT",
+        "confidence": 1.0,
+        "notes": "Column exists"
+      },
+      {
+        "requirement_item": "Column: OE_ORDER_HEADERS_ALL.ORDER_DATE",
+        "metadata_match": "ORDER_DATE",
+        "match_status": "EXACT",
+        "confidence": 1.0,
+        "notes": "Column exists"
+      },
+      {
+        "requirement_item": "Column: OE_ORDER_HEADERS_ALL.ORDER_ID",
+        "metadata_match": "ORDER_ID",
+        "match_status": "EXACT",
+        "confidence": 1.0,
+        "notes": "Column exists"
+      },
+      {
+        "requirement_item": "Column: CUSTOMERS.REGISTRATION_DATE",
+        "metadata_match": "REGISTRATION_DATE",
+        "match_status": "EXACT",
+        "confidence": 1.0,
+        "notes": "Column exists"
+      },
+      {
+        "requirement_item": "Column: CUSTOMERS.STATUS",
+        "metadata_match": "STATUS",
+        "match_status": "EXACT",
+        "confidence": 1.0,
+        "notes": "Column exists"
+      },
+      {
+        "requirement_item": "Column: MARKETING_CAMPAIGNS.TOTAL_SPEND",
+        "metadata_match": "TOTAL_SPEND",
+        "match_status": "EXACT",
+        "confidence": 1.0,
+        "notes": "Column exists"
+      },
+      {
+        "requirement_item": "Column: MARKETING_CAMPAIGNS.CUSTOMERS_ACQUIRED",
+        "metadata_match": "CUSTOMERS_ACQUIRED",
+        "match_status": "EXACT",
+        "confidence": 1.0,
+        "notes": "Column exists"
+      },
+      {
+        "requirement_item": "Column: MARKETING_CAMPAIGNS.CAMPAIGN_ID",
+        "metadata_match": "CAMPAIGN_ID",
+        "match_status": "EXACT",
+        "confidence": 1.0,
+        "notes": "Column exists"
+      },
+      {
+        "requirement_item": "Column: CUSTOMER_REGISTRATION_SOURCE.CHANNEL",
+        "metadata_match": "CHANNEL",
+        "match_status": "EXACT",
+        "confidence": 1.0,
+        "notes": "Column exists"
+      },
+      {
+        "requirement_item": "Column: CUSTOMER_REGISTRATION_SOURCE.CAMPAIGN_ID",
+        "metadata_match": "CAMPAIGN_ID",
+        "match_status": "EXACT",
+        "confidence": 1.0,
+        "notes": "Column exists"
+      },
+      {
+        "requirement_item": "Column: CITY_TIER_MASTER.CITY",
+        "metadata_match": "CITY",
+        "match_status": "EXACT",
+        "confidence": 1.0,
+        "notes": "Column exists"
+      },
+      {
+        "requirement_item": "Column: CITY_TIER_MASTER.STATE",
+        "metadata_match": "STATE",
+        "match_status": "EXACT",
+        "confidence": 1.0,
+        "notes": "Column exists"
+      },
+      {
+        "requirement_item": "Column: CITY_TIER_MASTER.TIER",
+        "metadata_match": "TIER",
+        "match_status": "EXACT",
+        "confidence": 1.0,
+        "notes": "Column exists"
+      },
+      {
+        "requirement_item": "Column: CITY_TIER_MASTER.COUNTRY",
+        "metadata_match": "NOT_FOUND",
+        "match_status": "NOT_FOUND",
+        "confidence": 0.0,
+        "notes": "Country level missing from hierarchy"
+      },
+      {
+        "requirement_item": "Column: CITY_TIER_MASTER.REGION",
+        "metadata_match": "NOT_FOUND",
+        "match_status": "NOT_FOUND",
+        "confidence": 0.0,
+        "notes": "Region level missing from hierarchy"
+      },
+      {
+        "requirement_item": "Column: CUSTOMERS.EMAIL",
+        "metadata_match": "EMAIL",
+        "match_status": "EXACT",
+        "confidence": 1.0,
+        "notes": "Column exists"
+      },
+      {
+        "requirement_item": "Column: CUSTOMERS.CUSTOMER_TYPE",
+        "metadata_match": "CUSTOMER_TYPE",
+        "match_status": "EXACT",
+        "confidence": 1.0,
+        "notes": "Column exists"
+      },
+      {
+        "requirement_item": "Column: SURVEYS.NPS_SCORE",
+        "metadata_match": "NPS_SCORE",
+        "match_status": "EXACT",
+        "confidence": 1.0,
+        "notes": "Column exists"
+      },
+      {
+        "requirement_item": "Column: SURVEYS.NPS_CATEGORY",
+        "metadata_match": "NPS_CATEGORY",
+        "match_status": "EXACT",
+        "confidence": 1.0,
+        "notes": "Column exists"
+      },
+      {
+        "requirement_item": "Column: INCIDENTS.INCIDENT_ID",
+        "metadata_match": "INCIDENT_ID",
+        "match_status": "EXACT",
+        "confidence": 1.0,
+        "notes": "Column exists"
+      },
+      {
+        "requirement_item": "Column: INCIDENTS.CUSTOMER_ID",
+        "metadata_match": "CUSTOMER_ID",
+        "match_status": "EXACT",
+        "confidence": 1.0,
+        "notes": "Column exists"
+      },
+      {
+        "requirement_item": "Dimension: Customer Segment",
+        "metadata_match": "RFM Segment Derivation",
+        "match_status": "EXACT",
+        "confidence": 1.0,
+        "notes": "Can be derived from available data"
+      },
+      {
+        "requirement_item": "Dimension: Acquisition Channel",
+        "metadata_match": "CHANNEL",
+        "match_status": "EXACT",
+        "confidence": 1.0,
+        "notes": "Available in CUSTOMER_REGISTRATION_SOURCE"
+      },
+      {
+        "requirement_item": "Dimension: Geographic Region",
+        "metadata_match": "CITY_TIER_MASTER",
+        "match_status": "PARTIAL",
+        "confidence": 0.6,
+        "notes": "Missing hierarchy levels (Country, Region)"
+      },
+      {
+        "requirement_item": "Dimension: Loyalty Tier",
+        "metadata_match": "Loyalty Tier Derivation",
+        "match_status": "EXACT",
+        "confidence": 1.0,
+        "notes": "Can be derived from cumulative spend"
+      },
+      {
+        "requirement_item": "Dimension: Time",
+        "metadata_match": "NOT_FOUND",
+        "match_status": "NOT_FOUND",
+        "confidence": 0.0,
+        "notes": "No time dimension table in metadata"
+      },
+      {
+        "requirement_item": "Dimension: Product Category",
+        "metadata_match": "ERP.CATEGORIES",
+        "match_status": "EXACT",
+        "confidence": 1.0,
+        "notes": "Available via OE_ORDER_LINES_ALL joins"
+      },
+      {
+        "requirement_item": "Rule: BR-001",
+        "metadata_match": "ORDER_STATUS",
+        "match_status": "EXACT",
+        "confidence": 1.0,
+        "notes": "Can filter by ORDER_STATUS"
+      },
+      {
+        "requirement_item": "Rule: BR-002",
+        "metadata_match": "ORDER_STATUS",
+        "match_status": "EXACT",
+        "confidence": 1.0,
+        "notes": "Can filter by ORDER_STATUS"
+      },
+      {
+        "requirement_item": "Rule: BR-003",
+        "metadata_match": "ORDER_STATUS, SURVEYS.ORDER_ID",
+        "match_status": "EXACT",
+        "confidence": 1.0,
+        "notes": "Can join and filter"
+      },
+      {
+        "requirement_item": "Rule: BR-004",
+        "metadata_match": "ORDER_ID",
+        "match_status": "EXACT",
+        "confidence": 1.0,
+        "notes": "Can count orders"
+      },
+      {
+        "requirement_item": "Rule: BR-005",
+        "metadata_match": "STATUS",
+        "match_status": "PARTIAL",
+        "confidence": 0.5,
+        "notes": "Missing explicit churn date column"
+      },
+      {
+        "requirement_item": "Rule: BR-006",
+        "metadata_match": "CHANNEL, CAMPAIGN_ID",
+        "match_status": "EXACT",
+        "confidence": 1.0,
+        "notes": "Can implement logic"
+      },
+      {
+        "requirement_item": "Rule: DQ-001",
+        "metadata_match": "TOTAL_AMOUNT",
+        "match_status": "PARTIAL",
+        "confidence": 0.9,
+        "notes": "Naming discrepancy: ORDER_TOTAL vs TOTAL_AMOUNT"
+      },
+      {
+        "requirement_item": "Rule: DQ-002",
+        "metadata_match": "CUSTOMER_ID FK",
+        "match_status": "EXACT",
+        "confidence": 1.0,
+        "notes": "FK relationship exists"
+      },
+      {
+        "requirement_item": "Rule: DQ-003",
+        "metadata_match": "EMAIL",
+        "match_status": "EXACT",
+        "confidence": 1.0,
+        "notes": "Can validate format"
+      },
+      {
+        "requirement_item": "Rule: DQ-004",
+        "metadata_match": "ORDER_DATE",
+        "match_status": "EXACT",
+        "confidence": 1.0,
+        "notes": "Can validate date"
+      },
+      {
+        "requirement_item": "Rule: DQ-005",
+        "metadata_match": "NPS_SCORE",
+        "match_status": "EXACT",
+        "confidence": 1.0,
+        "notes": "Can validate range"
+      }
+    ],
+    "completeness": {
+      "complete": true,
+      "expected_elements": 54,
+      "analyzed_elements": 59,
+      "uncovered": 0,
+      "reason": "ok"
+    }
+  },
+  "resolved_gaps": {
+    "GAP-001": "ignore country and region",
+    "GAP-002": "Generate a standard Date dimension table in the analytics layer with the required hierarchy (Year -> Quarter -> Month -> Week -> Day).",
+    "GAP-003": "use MIN() and MAX() aggregations on ORDER_DATE.",
+    "GAP-004": "MAX(ORDER_DATE)",
+    "GAP-005": "Implement logic to track the timestamp of STATUS changes to 'Churned' (e.g., using SCD Type 2 history).",
+    "GAP-006": "TOTAL_AMOUNT is the correct column to use for Order Total",
+    "GAP-007": "Map Campaign_Total_Spend to TOTAL_SPEND.",
+    "GAP-008": "'New' customers (0 orders) be included in the CLV pipeline with a predicted value"
+  },
+  "pending_gaps": []
+}

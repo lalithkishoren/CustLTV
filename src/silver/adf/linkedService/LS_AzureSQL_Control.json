@@ -1,0 +1,14 @@
+{
+    "name": "LS_AzureSQL_Control",
+    "properties": {
+        "type": "AzureSqlDatabase",
+        "typeProperties": {
+            "server": "{{PLACEHOLDER_SQL_SERVER_FQDN}}",
+            "database": "{{PLACEHOLDER_SQL_DATABASE}}",
+            "encrypt": "true",
+            "trustServerCertificate": "false",
+            "hostNameInCertificate": "",
+            "authenticationType": "ManagedIdentity"
+        }
+    }
+}

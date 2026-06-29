@@ -1,0 +1,12 @@
+{
+    "name": "LS_AzureDatabricks",
+    "properties": {
+        "type": "AzureDatabricks",
+        "typeProperties": {
+            "domain": "https://{{PLACEHOLDER_DATABRICKS_WORKSPACE_URL}}",
+            "authentication": "ManagedIdentity",
+            "workspaceResourceId": "/subscriptions/{{PLACEHOLDER_SUBSCRIPTION_ID}}/resourceGroups/{{PLACEHOLDER_RESOURCE_GROUP}}/providers/Microsoft.Databricks/workspaces/{{PLACEHOLDER_DATABRICKS_WORKSPACE_NAME}}",
+            "existingClusterId": "{{PLACEHOLDER_CLUSTER_ID}}"
+        }
+    }
+}

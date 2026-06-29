@@ -1,0 +1,111 @@
+{
+    "name": "PL_Batch_Ingest_and_Process",
+    "properties": {
+        "description": "Daily batch ingestion for Marketing and Surveys, followed by DLT Bronze->Silver->Gold processing.",
+        "activities": [
+            {
+                "name": "Copy_Marketing_Data",
+                "type": "Copy",
+                "dependsOn": [],
+                "policy": {
+                    "timeout": "0.02:00:00",
+                    "retry": 3,
+                    "retryIntervalInSeconds": 300,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "typeProperties": {
+                    "source": {
+                        "type": "RestSource",
+                        "httpRequestTimeout": "00:05:00",
+                        "requestInterval": "00.00:00:05"
+                    },
+                    "sink": {
+                        "type": "ParquetSink",
+                        "storeSettings": {
+                            "type": "AzureBlobFSWriteSettings"
+                        },
+                        "formatSettings": {
+                            "type": "ParquetWriteSettings"
+                        }
+                    },
+                    "enableStaging": false
+                },
+                "inputs": [
+                    {
+                        "referenceName": "DS_REST_MarketingAPI",
+                        "type": "DatasetReference"
+                    }
+                ],
+                "outputs": [
+                    {
+                        "referenceName": "DS_ADLS_Bronze_Marketing",
+                        "type": "DatasetReference"
+                    }
+                ]
+            },
+            {
+                "name": "Run_DLT_Batch_Pipeline",
+                "type": "DatabricksDeltaLiveTables",
+                "dependsOn": [
+                    {
+                        "activity": "Copy_Marketing_Data",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "timeout": "0.04:00:00",
+                    "retry": 1,
+                    "retryIntervalInSeconds": 300,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "typeProperties": {
+                    "pipelineId": "@{pipeline().parameters.dlt_batch_pipeline_id}",
+                    "updateType": "Refresh"
+                },
+                "linkedServiceName": {
+                    "referenceName": "LS_Databricks",
+                    "type": "LinkedServiceReference"
+                }
+            },
+            {
+                "name": "Log_Failure_To_Control_DB",
+                "type": "SqlServerStoredProcedure",
+                "dependsOn": [
+                    {
+                        "activity": "Run_DLT_Batch_Pipeline",
+                        "dependencyConditions": [
+                            "Failed"
+                        ]
+                    }
+                ],
+                "typeProperties": {
+                    "storedProcedureName": "[dbo].[LogPipelineFailure]",
+                    "storedProcedureParameters": {
+                        "PipelineName": {
+                            "value": "@{pipeline().Pipeline}",
+                            "type": "String"
+                        },
+                        "RunId": {
+                            "value": "@{pipeline().RunId}",
+                            "type": "String"
+                        }
+                    }
+                },
+                "linkedServiceName": {
+                    "referenceName": "LS_AzureSQL_Control",
+                    "type": "LinkedServiceReference"
+                }
+            }
+        ],
+        "parameters": {
+            "dlt_batch_pipeline_id": {
+                "type": "string",
+                "defaultValue": "to-be-injected-by-terraform"
+            }
+        }
+    }
+}

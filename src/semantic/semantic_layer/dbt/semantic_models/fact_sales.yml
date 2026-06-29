@@ -1,0 +1,51 @@
+# dbt Semantic Layer (MetricFlow) - Semantic Model for Sales Fact
+semantic_models:
+  - name: fact_sales
+    description: "Gold layer transaction fact table for customer orders. Grain: One row per product line item within a customer order."
+    model: ref('fact_sales')
+    defaults:
+      agg_time_dimension: order_date
+
+    entities:
+      - name: order_line_id
+        type: primary
+      - name: order_id
+        type: foreign
+      - name: customer_id
+        type: foreign
+      - name: product_id
+        type: foreign
+      - name: campaign_id
+        type: foreign
+      - name: location_id
+        type: foreign
+
+    dimensions:
+      - name: order_date
+        type: time
+        type_params:
+          time_granularity: day
+      - name: order_status
+        type: categorical
+        description: "Status of the order (e.g., Delivered, Shipped)."
+
+    measures:
+      - name: total_amount
+        description: "Total revenue amount for the order line."
+        agg: sum
+        expr: total_amount
+      
+      - name: unique_orders
+        description: "Count of unique orders."
+        agg: count_distinct
+        expr: order_id
+
+      - name: first_order_date
+        description: "First order date for a given dimension slice (used for frequency calc)."
+        agg: min
+        expr: order_date
+
+      - name: last_order_date
+        description: "Last order date for a given dimension slice (used for frequency calc)."
+        agg: max
+        expr: order_date

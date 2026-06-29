@@ -1,0 +1,45 @@
+{
+  "name": "clv_batch_analytics_pipeline",
+  "catalog": "clv_analytics",
+  "target": "gold",
+  "continuous": false,
+  "development": false,
+  "edition": "ADVANCED",
+  "channel": "CURRENT",
+  "clusters": [
+    {
+      "label": "default",
+      "autoscale": {
+        "min_workers": 2,
+        "max_workers": 16,
+        "mode": "ENHANCED"
+      },
+      "custom_tags": {
+        "CostCenter": "DataPlatform",
+        "Project": "CLV_Analytics"
+      }
+    }
+  ],
+  "libraries": [
+    {
+      "notebook": {
+        "path": "/Workspace/Pipelines/Bronze/bronze_batch_ingestion"
+      }
+    },
+    {
+      "notebook": {
+        "path": "/Workspace/Pipelines/Silver/silver_marketing_cleansing"
+      }
+    },
+    {
+      "notebook": {
+        "path": "/Workspace/Pipelines/Gold/gold_clv_kpi_aggregations"
+      }
+    }
+  ],
+  "configuration": {
+    "pipelines.bronze.storage_path": "abfss://bronze@{{PLACEHOLDER_STORAGE_ACCOUNT}}.dfs.core.windows.net/",
+    "pipelines.silver.storage_path": "abfss://silver@{{PLACEHOLDER_STORAGE_ACCOUNT}}.dfs.core.windows.net/",
+    "pipelines.gold.storage_path": "abfss://gold@{{PLACEHOLDER_STORAGE_ACCOUNT}}.dfs.core.windows.net/"
+  }
+}

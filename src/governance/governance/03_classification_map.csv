@@ -1,0 +1,14 @@
+catalog,schema,table,column,classification_tier,data_domain,contains_pii,masking_required
+myntra_prod,silver,customers,customer_id,Internal,CRM,false,false
+myntra_prod,silver,customers,first_name,Restricted,CRM,true,true
+myntra_prod,silver,customers,last_name,Restricted,CRM,true,true
+myntra_prod,silver,customers,email,Restricted,CRM,true,true
+myntra_prod,silver,customers,phone_number,Restricted,CRM,true,true
+myntra_prod,silver,addresses,address_line_1,Restricted,ERP,true,true
+myntra_prod,silver,addresses,postal_code,Internal,ERP,false,false
+myntra_prod,gold,dim_customer,customer_id,Internal,Conformed,false,false
+myntra_prod,gold,dim_customer,email,Restricted,Conformed,true,true
+myntra_prod,gold,dim_customer,phone_number,Restricted,Conformed,true,true
+myntra_prod,gold,fact_sales,order_id,Internal,Sales,false,false
+myntra_prod,gold,fact_sales,line_total,Internal,Sales,false,false
+myntra_prod,gold,agg_customer_clv,clv_predicted,Internal,Analytics,false,false

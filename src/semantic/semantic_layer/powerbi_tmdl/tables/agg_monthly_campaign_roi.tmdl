@@ -1,0 +1,35 @@
+// Power BI Tabular Model Definition Language (TMDL)
+
+table agg_monthly_campaign_roi
+  lineageTag: agg_monthly_campaign_roi
+  description: "Gold layer aggregate table for monthly campaign performance and spend."
+
+  column campaign_id
+    dataType: string
+    sourceColumn: campaign_id
+    isHidden: true
+
+  column campaign_month
+    dataType: dateTime
+    sourceColumn: campaign_month
+    summarizeBy: none
+
+  column total_spend
+    dataType: double
+    sourceColumn: total_spend
+    formatString: \$#,0.00
+    summarizeBy: sum
+
+  column customers_acquired
+    dataType: int64
+    sourceColumn: customers_acquired
+    summarizeBy: sum
+
+  measure 'Customer Acquisition Cost (CAC)' = 
+    DIVIDE(
+        SUM(agg_monthly_campaign_roi[total_spend]), 
+        SUM(agg_monthly_campaign_roi[customers_acquired])
+    )
+    formatString: \$#,0.00
+    displayFolder: "Core KPIs"
+    description: "Measures the cost to acquire a new customer via marketing campaigns."

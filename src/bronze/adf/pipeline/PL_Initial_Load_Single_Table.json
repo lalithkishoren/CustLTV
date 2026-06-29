@@ -1,0 +1,161 @@
+{
+    "name": "PL_Initial_Load_Single_Table",
+    "properties": {
+        "activities": [
+            {
+                "name": "Copy_FullTable_ToStaging",
+                "type": "Copy",
+                "dependsOn": [],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 3,
+                    "retryIntervalInSeconds": 300,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "source": {
+                        "type": "AzureSqlSource",
+                        "sqlReaderQuery": {
+                            "value": "SELECT * FROM @{pipeline().parameters.schema_name}.@{pipeline().parameters.table_name}",
+                            "type": "Expression"
+                        },
+                        "queryTimeout": "02:00:00",
+                        "partitionOption": "None"
+                    },
+                    "sink": {
+                        "type": "ParquetSink",
+                        "storeSettings": {
+                            "type": "AzureBlobFSWriteSettings"
+                        },
+                        "formatSettings": {
+                            "type": "ParquetWriteSettings"
+                        }
+                    },
+                    "enableStaging": false
+                },
+                "inputs": [
+                    {
+                        "referenceName": "DS_AzureSQL_Source",
+                        "type": "DatasetReference",
+                        "parameters": {
+                            "schemaName": {
+                                "value": "@pipeline().parameters.schema_name",
+                                "type": "Expression"
+                            },
+                            "tableName": {
+                                "value": "@pipeline().parameters.table_name",
+                                "type": "Expression"
+                            }
+                        }
+                    }
+                ],
+                "outputs": [
+                    {
+                        "referenceName": "DS_Parquet_Bronze_Staging",
+                        "type": "DatasetReference",
+                        "parameters": {
+                            "source_system": {
+                                "value": "@pipeline().parameters.source_system",
+                                "type": "Expression"
+                            },
+                            "schema_name": {
+                                "value": "@pipeline().parameters.schema_name",
+                                "type": "Expression"
+                            },
+                            "table_name": {
+                                "value": "@pipeline().parameters.table_name",
+                                "type": "Expression"
+                            },
+                            "load_type": "initial",
+                            "pipeline_run_id": {
+                                "value": "@pipeline().parameters.pipeline_run_id",
+                                "type": "Expression"
+                            }
+                        }
+                    }
+                ]
+            },
+            {
+                "name": "Notebook_InitialLoad",
+                "type": "DatabricksNotebook",
+                "dependsOn": [
+                    {
+                        "activity": "Copy_FullTable_ToStaging",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "notebookPath": "/Shared/bronze/Initial_Load_Dynamic",
+                    "baseParameters": {
+                        "pipeline_run_id": {
+                            "value": "@pipeline().parameters.pipeline_run_id",
+                            "type": "Expression"
+                        },
+                        "table_id": {
+                            "value": "@pipeline().parameters.table_id",
+                            "type": "Expression"
+                        },
+                        "source_system": {
+                            "value": "@pipeline().parameters.source_system",
+                            "type": "Expression"
+                        },
+                        "schema_name": {
+                            "value": "@pipeline().parameters.schema_name",
+                            "type": "Expression"
+                        },
+                        "table_name": {
+                            "value": "@pipeline().parameters.table_name",
+                            "type": "Expression"
+                        },
+                        "primary_key_columns": {
+                            "value": "@pipeline().parameters.primary_key_columns",
+                            "type": "Expression"
+                        },
+                        "storage_account": "{{PLACEHOLDER_STORAGE_ACCOUNT}}",
+                        "sql_server": "{{PLACEHOLDER_SQL_SERVER_FQDN}}",
+                        "sql_database": "{{PLACEHOLDER_SQL_DATABASE}}",
+                        "sql_username": "{{PLACEHOLDER_SQL_USERNAME}}",
+                        "sql_password": "{{PLACEHOLDER_SQL_PASSWORD}}"
+                    }
+                },
+                "linkedServiceName": {
+                    "referenceName": "LS_AzureDatabricks",
+                    "type": "LinkedServiceReference"
+                }
+            }
+        ],
+        "parameters": {
+            "pipeline_run_id": {
+                "type": "string"
+            },
+            "table_id": {
+                "type": "string"
+            },
+            "source_system": {
+                "type": "string"
+            },
+            "schema_name": {
+                "type": "string"
+            },
+            "table_name": {
+                "type": "string"
+            },
+            "primary_key_columns": {
+                "type": "string"
+            }
+        },
+        "annotations": []
+    }
+}

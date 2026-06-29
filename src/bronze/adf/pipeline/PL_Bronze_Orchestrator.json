@@ -1,0 +1,165 @@
+{
+    "name": "PL_Bronze_Orchestrator",
+    "properties": {
+        "activities": [
+            {
+                "name": "Lookup_ActiveTables",
+                "type": "Lookup",
+                "dependsOn": [],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "source": {
+                        "type": "AzureSqlSource",
+                        "sqlReaderQuery": "SELECT t.*, s.source_system_name FROM control.table_metadata t JOIN control.source_systems s ON t.source_system_id = s.source_system_id WHERE t.is_active = 1 ORDER BY t.load_priority ASC",
+                        "queryTimeout": "02:00:00",
+                        "partitionOption": "None"
+                    },
+                    "dataset": {
+                        "referenceName": "DS_ControlDB",
+                        "type": "DatasetReference",
+                        "parameters": {
+                            "schemaName": "control",
+                            "tableName": "table_metadata"
+                        }
+                    },
+                    "firstRowOnly": false
+                }
+            },
+            {
+                "name": "ForEach_Table",
+                "type": "ForEach",
+                "dependsOn": [
+                    {
+                        "activity": "Lookup_ActiveTables",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                    "items": {
+                        "value": "@activity('Lookup_ActiveTables').output.value",
+                        "type": "Expression"
+                    },
+                    "isSequential": false,
+                    "batchCount": 5,
+                    "activities": [
+                        {
+                            "name": "IfCondition_LoadType",
+                            "type": "IfCondition",
+                            "dependsOn": [],
+                            "userProperties": [],
+                            "typeProperties": {
+                                "expression": {
+                                    "value": "@equals(item().initial_load_completed, false)",
+                                    "type": "Expression"
+                                },
+                                "ifTrueActivities": [
+                                    {
+                                        "name": "Execute_Initial_Load",
+                                        "type": "ExecutePipeline",
+                                        "dependsOn": [],
+                                        "userProperties": [],
+                                        "typeProperties": {
+                                            "pipeline": {
+                                                "referenceName": "PL_Initial_Load_Single_Table",
+                                                "type": "PipelineReference"
+                                            },
+                                            "waitOnCompletion": true,
+                                            "parameters": {
+                                                "pipeline_run_id": {
+                                                    "value": "@pipeline().parameters.pipeline_run_id",
+                                                    "type": "Expression"
+                                                },
+                                                "table_id": {
+                                                    "value": "@item().table_id",
+                                                    "type": "Expression"
+                                                },
+                                                "source_system": {
+                                                    "value": "@item().source_system_name",
+                                                    "type": "Expression"
+                                                },
+                                                "schema_name": {
+                                                    "value": "@item().schema_name",
+                                                    "type": "Expression"
+                                                },
+                                                "table_name": {
+                                                    "value": "@item().table_name",
+                                                    "type": "Expression"
+                                                },
+                                                "primary_key_columns": {
+                                                    "value": "@item().primary_key_columns",
+                                                    "type": "Expression"
+                                                }
+                                            }
+                                        }
+                                    }
+                                ],
+                                "ifFalseActivities": [
+                                    {
+                                        "name": "Execute_Incremental_CDC",
+                                        "type": "ExecutePipeline",
+                                        "dependsOn": [],
+                                        "userProperties": [],
+                                        "typeProperties": {
+                                            "pipeline": {
+                                                "referenceName": "PL_Incremental_CDC_Single_Table",
+                                                "type": "PipelineReference"
+                                            },
+                                            "waitOnCompletion": true,
+                                            "parameters": {
+                                                "pipeline_run_id": {
+                                                    "value": "@pipeline().parameters.pipeline_run_id",
+                                                    "type": "Expression"
+                                                },
+                                                "table_id": {
+                                                    "value": "@item().table_id",
+                                                    "type": "Expression"
+                                                },
+                                                "source_system": {
+                                                    "value": "@item().source_system_name",
+                                                    "type": "Expression"
+                                                },
+                                                "schema_name": {
+                                                    "value": "@item().schema_name",
+                                                    "type": "Expression"
+                                                },
+                                                "table_name": {
+                                                    "value": "@item().table_name",
+                                                    "type": "Expression"
+                                                },
+                                                "primary_key_columns": {
+                                                    "value": "@item().primary_key_columns",
+                                                    "type": "Expression"
+                                                },
+                                                "last_sync_version": {
+                                                    "value": "@item().last_sync_version",
+                                                    "type": "Expression"
+                                                }
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            }
+        ],
+        "parameters": {
+            "pipeline_run_id": {
+                "type": "string",
+                "defaultValue": "@pipeline().RunId"
+            }
+        },
+        "annotations": []
+    }
+}

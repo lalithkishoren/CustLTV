@@ -1,0 +1,55 @@
+// Power BI Tabular Model Definition Language (TMDL)
+// Defines the semantic layer directly within the Power BI dataset for native BI consumption.
+
+table fact_sales
+  lineageTag: fact_sales
+  description: "Gold layer transaction fact table for customer orders."
+
+  column order_line_id
+    dataType: string
+    sourceColumn: order_line_id
+    isHidden: true
+
+  column order_id
+    dataType: string
+    sourceColumn: order_id
+    isHidden: true
+
+  column customer_id
+    dataType: string
+    sourceColumn: customer_id
+    isHidden: true
+
+  column total_amount
+    dataType: double
+    sourceColumn: total_amount
+    formatString: \$#,0.00
+    summarizeBy: sum
+
+  column order_date
+    dataType: dateTime
+    sourceColumn: order_date
+    summarizeBy: none
+
+  measure 'Average Order Value (AOV)' = 
+    DIVIDE(
+        SUM(fact_sales[total_amount]), 
+        DISTINCTCOUNT(fact_sales[order_id])
+    )
+    formatString: \$#,0.00
+    displayFolder: "Core KPIs"
+    description: "Measures the average revenue generated per unique order."
+
+  measure 'Purchase Frequency' = 
+    VAR MinDate = MIN(fact_sales[order_date])
+    VAR MaxDate = MAX(fact_sales[order_date])
+    VAR DaysDiff = DATEDIFF(MinDate, MaxDate, DAY)
+    VAR Months = DIVIDE(DaysDiff, 30.0)
+    RETURN 
+        DIVIDE(
+            DISTINCTCOUNT(fact_sales[order_id]), 
+            Months
+        )
+    formatString: #,0.00
+    displayFolder: "Core KPIs"
+    description: "Measures the average number of purchases per 30-day period for a customer."

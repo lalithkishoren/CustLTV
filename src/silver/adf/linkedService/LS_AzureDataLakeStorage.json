@@ -1,0 +1,10 @@
+{
+    "name": "LS_AzureDataLakeStorage",
+    "properties": {
+        "type": "AzureBlobFS",
+        "typeProperties": {
+            "url": "https://{{PLACEHOLDER_STORAGE_ACCOUNT}}.dfs.core.windows.net/"
+        },
+        "authenticationType": "ManagedIdentity"
+    }
+}

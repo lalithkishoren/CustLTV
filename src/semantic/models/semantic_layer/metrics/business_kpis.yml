@@ -1,0 +1,27 @@
+metrics:
+  - name: customer_lifetime_value
+    description: "Customer Lifetime Value (CLV). The net revenue value of a customer, accounting for the cost to acquire them."
+    type: derived
+    type_params:
+      expr: total_sales_amount - campaign_acquisition_cost
+      metrics:
+        - name: total_sales_amount
+        - name: campaign_acquisition_cost
+
+  - name: average_order_value
+    description: "Average Order Value (AOV). The average revenue generated per unique order placed."
+    type: derived
+    type_params:
+      expr: total_sales_amount / nullif(order_count, 0)
+      metrics:
+        - name: total_sales_amount
+        - name: order_count
+
+  - name: purchase_frequency
+    description: "Purchase Frequency. The average number of orders placed by a customer per month of their tenure."
+    type: derived
+    type_params:
+      expr: order_count / nullif(customer_tenure_months, 0)
+      metrics:
+        - name: order_count
+        - name: customer_tenure_months

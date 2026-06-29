@@ -1,0 +1,31 @@
+# dbt Semantic Layer (MetricFlow) - Semantic Model for Campaign ROI Aggregate
+semantic_models:
+  - name: agg_monthly_campaign_roi
+    description: "Gold layer aggregate table for monthly campaign performance and spend. Grain: Campaign / Month."
+    model: ref('agg_monthly_campaign_roi')
+    defaults:
+      agg_time_dimension: campaign_month
+
+    entities:
+      - name: campaign_id
+        type: foreign
+
+    dimensions:
+      - name: campaign_month
+        type: time
+        type_params:
+          time_granularity: month
+      - name: channel
+        type: categorical
+        description: "Marketing channel (e.g., Organic, Paid Search, Social)."
+
+    measures:
+      - name: total_spend
+        description: "Total marketing spend for the campaign in the given month."
+        agg: sum
+        expr: total_spend
+        
+      - name: customers_acquired
+        description: "Number of net-new customers acquired attributed to this campaign."
+        agg: sum
+        expr: customers_acquired

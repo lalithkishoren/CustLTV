@@ -1,0 +1,33 @@
+{
+    "name": "PL_CDC_Streaming_Process",
+    "properties": {
+        "description": "Ensures the continuous DLT pipeline for ERP and CRM CDC is running.",
+        "activities": [
+            {
+                "name": "Start_DLT_Continuous_Pipeline",
+                "type": "DatabricksDeltaLiveTables",
+                "dependsOn": [],
+                "policy": {
+                    "timeout": "7.00:00:00",
+                    "retry": 0,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "typeProperties": {
+                    "pipelineId": "@{pipeline().parameters.dlt_cdc_pipeline_id}",
+                    "updateType": "Start"
+                },
+                "linkedServiceName": {
+                    "referenceName": "LS_Databricks",
+                    "type": "LinkedServiceReference"
+                }
+            }
+        ],
+        "parameters": {
+            "dlt_cdc_pipeline_id": {
+                "type": "string",
+                "defaultValue": "to-be-injected-by-terraform"
+            }
+        }
+    }
+}

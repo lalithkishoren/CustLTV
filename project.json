@@ -1,0 +1,14 @@
+{
+  "id": "8f011e6b-eae1-4dfe-9eca-3a34933b6d18",
+  "name": "CustLifeTimeValue",
+  "slug": "custlifetimevalue",
+  "description": "",
+  "platform": "Azure",
+  "tech_stack": "",
+  "created_by": "user",
+  "created_at": "2026-06-24T01:57:32.308090+00:00",
+  "updated_at": "2026-06-29T04:26:49.277821+00:00",
+  "status": "active",
+  "lifecycle": {},
+  "artifact_count": 183
+}

@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gold Layer Star Schema Design</title>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --surface-color: #1e1e1e;
+            --text-primary: #e0e0e0;
+            --text-secondary: #a0a0a0;
+            --gold-primary: #DAA520;
+            --gold-light: #FFD700;
+            --gold-dark: #B8860B;
+            --border-color: #333333;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+        }
+
+        header {
+            background: linear-gradient(135deg, #000000 0%, #1a1a1a 100%);
+            border-bottom: 3px solid var(--gold-primary);
+            padding: 2rem;
+            text-align: center;
+        }
+
+        h1 {
+            color: var(--gold-light);
+            margin: 0;
+            font-size: 2.5rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        h2 {
+            color: var(--gold-primary);
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.5rem;
+            margin-top: 3rem;
+        }
+
+        h3 {
+            color: #ffffff;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .schema-section {
+            background-color: var(--surface-color);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 2rem;
+            margin-bottom: 3rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        .diagram-container {
+            background-color: #ffffff; /* White background for better PlantUML visibility */
+            border: 2px solid var(--gold-primary);
+            border-radius: 4px;
+            padding: 1rem;
+            margin: 2rem 0;
+            text-align: center;
+            overflow-x: auto;
+        }
+
+        .plantuml {
+            display: none; /* Hide raw code */
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+            background-color: #1a1a1a;
+        }
+
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th {
+            background-color: #252525;
+            color: var(--gold-light);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.9rem;
+        }
+
+        tr:hover {
+            background-color: #2a2a2a;
+        }
+
+        .key-col {
+            color: var(--gold-primary);
+            font-weight: bold;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.25em 0.6em;
+            font-size: 0.75em;
+            font-weight: 700;
+            border-radius: 0.25rem;
+            background-color: var(--gold-dark);
+            color: #fff;
+        }
+    </style>
+    <!-- PlantUML Encoder -->
+    <script src="https://cdn.jsdelivr.net/npm/plantuml-encoder@1.4.0/dist/plantuml-encoder.min.js"></script>
+</head>
+<body>
+
+    <header>
+        <h1>Gold Layer Dimensional Model</h1>
+        <p style="color: var(--text-secondary); margin-top: 10px;">Enterprise Data Warehouse Star Schemas</p>
+    </header>
+
+    <div class="container">
+
+        <!-- ==========================================
+             FACT SALES SCHEMA
+        =========================================== -->
+        <div class="schema-section">
+            <h2>1. Sales & Order Fulfillment (fact_sales)</h2>
+            <p>Tracks revenue, discounts, and product sales at the order line level.</p>
+            
+            <div class="diagram-container" id="diagram-sales">
+<pre class="plantuml">
+@startuml
+skinparam linetype ortho
+skinparam backgroundColor transparent
+skinparam entityBorderColor #DAA520
+skinparam entityBackgroundColor #FEFECE
+hide circle
+
+entity dim_date {
+    *dim_date_key : INT
+    --
+    full_date : DATE
+    day_of_week : INT
+    day_name : VARCHAR
+    day_of_month : INT
+    day_of_year : INT
+    week_of_year : INT
+    month_number : INT
+    month_name : VARCHAR
+    quarter : INT
+    year : INT
+    is_weekend : BOOLEAN
+    is_holiday : BOOLEAN
+}
+
+entity dim_customer {
+    *dim_customer_key : BIGINT
+    --
+    *customer_id : BIGINT
+    email : STRING
+    phone : STRING
+    full_name : STRING
+    gender : STRING
+    customer_type : STRING
+    status : STRING
+    marketing_opt_in : BOOLEAN
+    registration_date : TIMESTAMP
+    _valid_from : TIMESTAMP
+    _valid_to : TIMESTAMP
+    _is_current : BOOLEAN
+    _version : INT
+}
+
+entity dim_product {
+    *dim_product_key : BIGINT
+    --
+    *inventory_item_id : BIGINT
+    sku : STRING
+    product_name : STRING
+    category_name : STRING
+    brand_name : STRING
+    unit_cost : DECIMAL
+}
+
+entity dim_location {
+    *dim_location_key : BIGINT
+    --
+    *address_id : BIGINT
+    city : STRING
+    state : STRING
+    postal_code : STRING
+    country : STRING
+    city_tier : STRING
+}
+
+entity dim_campaign {
+    *dim_campaign_key : BIGINT
+    --
+    *campaign_id : INT
+    campaign_name : STRING
+    channel : STRING
+    sub_channel : STRING
+    status : STRING
+    start_date : DATE
+    end_date : DATE
+}
+
+entity fact_sales {
+    *order_id : BIGINT
+    *line_id : BIGINT
+    --
+    *dim_date_key : INT
+    *dim_customer_key : BIGINT
+    *dim_product_key : BIGINT
+    *dim_location_key : BIGINT
+    *dim_campaign_key : BIGINT
+    order_number : STRING
+    order_status : STRING
+    quantity : INT
+    line_total : DECIMAL
+    allocated_discount_amount : DECIMAL
+    allocated_tax_amount : DECIMAL
+    unit_price : DECIMAL
+}
+
+dim_date ||--o{ fact_sales : "has"
+dim_customer ||--o{ fact_sales : "has"
+dim_product ||--o{ fact_sales : "has"
+dim_location ||--o{ fact_sales : "has"
+dim_campaign ||--o{ fact_sales : "has"
+@enduml
+</pre>
+            </div>
+
+            <h3>Fact Table Details: fact_sales</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Column Name</th>
+                        <th>Data Type</th>
+                        <th>Type</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td class="key-col">dim_date_key</td><td>INT</td><td><span class="badge">FK</span></td><td>Foreign key to dim_date</td></tr>
+                    <tr><td class="key-col">dim_customer_key</td><td>BIGINT</td><td><span class="badge">FK</span></td><td>Foreign key to dim_customer</td></tr>
+                    <tr><td class="key-col">dim_product_key</td><td>BIGINT</td><td><span class="badge">FK</span></td><td>Foreign key to dim_product</td></tr>
+                    <tr><td class="key-col">dim_location_key</td><td>BIGINT</td><td><span class="badge">FK</span></td><td>Foreign key to dim_location</td></tr>
+                    <tr><td class="key-col">dim_campaign_key</td><td>BIGINT</td><td><span class="badge">FK</span></td><td>Foreign key to dim_campaign</td></tr>
+                    <tr><td>order_id</td><td>BIGINT</td><td>Degenerate Dim</td><td>Source system order ID</td></tr>
+                    <tr><td>line_id</td><td>BIGINT</td><td>Degenerate Dim</td><td>Source system line ID</td></tr>
+                    <tr><td>quantity</td><td>INT</td><td>Additive Measure</td><td>Number of units purchased</td></tr>
+                    <tr><td>line_total</td><td>DECIMAL(15,2)</td><td>Additive Measure</td><td>Total amount for the line</td></tr>
+                    <tr><td>allocated_discount_amount</td><td>DECIMAL(15,2)</td><td>Additive Measure</td><td>Header discount allocated to line</td></tr>
+                    <tr><td>unit_price</td><td>DECIMAL(15,2)</td><td>Non-Additive</td><td>Price per unit</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- ==========================================
+             FACT INTERACTIONS SCHEMA
+        =========================================== -->
+        <div class="schema-section">
+            <h2>2. Customer Service (fact_interactions)</h2>
+            <p>Tracks customer incidents and interactions to measure support load and customer friction.</p>
+            
+            <div class="diagram-container" id="diagram-interactions">
+<pre class="plantuml">
+@startuml
+skinparam linetype ortho
+skinparam backgroundColor transparent
+skinparam entityBorderColor #DAA520
+skinparam entityBackgroundColor #FEFECE
+hide circle
+
+entity dim_date {
+    *dim_date_key : INT
+    --
+    full_date : DATE
+    day_of_week : INT
+    day_name : VARCHAR
+    day_of_month : INT
+    day_of_year : INT
+    week_of_year : INT
+    month_number : INT
+    month_name : VARCHAR
+    quarter : INT
+    year : INT
+    is_weekend : BOOLEAN
+    is_holiday : BOOLEAN
+}
+
+entity dim_customer {
+    *dim_customer_key : BIGINT
+    --
+    *customer_id : BIGINT
+    email : STRING
+    phone : STRING
+    full_name : STRING
+    gender : STRING
+    customer_type : STRING
+    status : STRING
+    marketing_opt_in : BOOLEAN
+    registration_date : TIMESTAMP
+    _valid_from : TIMESTAMP
+    _valid_to : TIMESTAMP
+    _is_current : BOOLEAN
+    _version : INT
+}
+
+entity fact_interactions {
+    *interaction_id : BIGINT
+    --
+    *dim_date_key : INT
+    *dim_customer_key : BIGINT
+    incident_id : BIGINT
+    interaction_type : STRING
+    incident_status : STRING
+    incident_priority : STRING
+    interaction_count : INT
+}
+
+dim_date ||--o{ fact_interactions : "has"
+dim_customer ||--o{ fact_interactions : "has"
+@enduml
+</pre>
+            </div>
+
+            <h3>Fact Table Details: fact_interactions</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Column Name</th>
+                        <th>Data Type</th>
+                        <th>Type</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td class="key-col">dim_date_key</td><td>INT</td><td><span class="badge">FK</span></td><td>Foreign key to dim_date</td></tr>
+                    <tr><td class="key-col">dim_customer_key</td><td>BIGINT</td><td><span class="badge">FK</span></td><td>Foreign key to dim_customer</td></tr>
+                    <tr><td>interaction_id</td><td>BIGINT</td><td>Degenerate Dim</td><td>Source interaction ID</td></tr>
+                    <tr><td>incident_id</td><td>BIGINT</td><td>Degenerate Dim</td><td>Source incident ID</td></tr>
+                    <tr><td>interaction_type</td><td>STRING</td><td>Degenerate Dim</td><td>Type of interaction (Call, Email, etc.)</td></tr>
+                    <tr><td>incident_status</td><td>STRING</td><td>Degenerate Dim</td><td>Status of the parent incident</td></tr>
+                    <tr><td>interaction_count</td><td>INT</td><td>Additive Measure</td><td>Always 1, used for counting</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- ==========================================
+             FACT SURVEYS SCHEMA
+        =========================================== -->
+        <div class="schema-section">
+            <h2>3. Customer Feedback (fact_surveys)</h2>
+            <p>Tracks NPS and CSAT scores to correlate satisfaction with retention and revenue.</p>
+            
+            <div class="diagram-container" id="diagram-surveys">
+<pre class="plantuml">
+@startuml
+skinparam linetype ortho
+skinparam backgroundColor transparent
+skinparam entityBorderColor #DAA520
+skinparam entityBackgroundColor #FEFECE
+hide circle
+
+entity dim_date {
+    *dim_date_key : INT
+    --
+    full_date : DATE
+    day_of_week : INT
+    day_name : VARCHAR
+    day_of_month : INT
+    day_of_year : INT
+    week_of_year : INT
+    month_number : INT
+    month_name : VARCHAR
+    quarter : INT
+    year : INT
+    is_weekend : BOOLEAN
+    is_holiday : BOOLEAN
+}
+
+entity dim_customer {
+    *dim_customer_key : BIGINT
+    --
+    *customer_id : BIGINT
+    email : STRING
+    phone : STRING
+    full_name : STRING
+    gender : STRING
+    customer_type : STRING
+    status : STRING
+    marketing_opt_in : BOOLEAN
+    registration_date : TIMESTAMP
+    _valid_from : TIMESTAMP
+    _valid_to : TIMESTAMP
+    _is_current : BOOLEAN
+    _version : INT
+}
+
+entity fact_surveys {
+    *survey_id : BIGINT
+    --
+    *dim_date_key : INT
+    *dim_customer_key : BIGINT
+    order_id : BIGINT
+    incident_id : BIGINT
+    survey_type : STRING
+    nps_category : STRING
+    nps_score : INT
+    csat_score : INT
+}
+
+dim_date ||--o{ fact_surveys : "has"
+dim_customer ||--o{ fact_surveys : "has"
+@enduml
+</pre>
+            </div>
+
+            <h3>Fact Table Details: fact_surveys</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Column Name</th>
+                        <th>Data Type</th>
+                        <th>Type</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td class="key-col">dim_date_key</td><td>INT</td><td><span class="badge">FK</span></td><td>Foreign key to dim_date</td></tr>
+                    <tr><td class="key-col">dim_customer_key</td><td>BIGINT</td><td><span class="badge">FK</span></td><td>Foreign key to dim_customer</td></tr>
+                    <tr><td>survey_id</td><td>BIGINT</td><td>Degenerate Dim</td><td>Source survey ID</td></tr>
+                    <tr><td>survey_type</td><td>STRING</td><td>Degenerate Dim</td><td>Type of survey (NPS, CSAT)</td></tr>
+                    <tr><td>nps_category</td><td>STRING</td><td>Degenerate Dim</td><td>Promoter, Passive, Detractor</td></tr>
+                    <tr><td>nps_score</td><td>INT</td><td>Non-Additive</td><td>Net Promoter Score (0-10)</td></tr>
+                    <tr><td>csat_score</td><td>INT</td><td>Non-Additive</td><td>Customer Satisfaction Score (1-5)</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+
+    <script>
+        // Render PlantUML diagrams on the client side
+        document.addEventListener('DOMContentLoaded', function() {
+            const plantumlBlocks = document.querySelectorAll('.plantuml');
+            
+            plantumlBlocks.forEach(block => {
+                const code = block.textContent.trim();
+                const encoded = plantumlEncoder.encode(code);
+                const url = 'https://www.plantuml.com/plantuml/svg/' + encoded;
+                
+                const img = document.createElement('img');
+                img.src = url;
+                img.alt = 'PlantUML Diagram';
+                img.style.maxWidth = '100%';
+                img.style.height = 'auto';
+                
+                // Insert image and keep the pre block hidden
+                block.parentNode.insertBefore(img, block);
+            });
+        });
+    </script>
+</body>
+</html>

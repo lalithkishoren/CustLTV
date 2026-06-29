@@ -1,0 +1,42 @@
+# Databricks Asset Bundle (DAB) Configuration
+bundle:
+  name: myntra_clv_platform
+
+variables:
+  catalog_name:
+    description: "Unity Catalog name for the environment"
+  bronze_schema:
+    description: "Schema for Bronze layer"
+    default: "bronze"
+  silver_schema:
+    description: "Schema for Silver layer"
+    default: "silver"
+  gold_schema:
+    description: "Schema for Gold layer"
+    default: "gold"
+
+include:
+  - resources/*.yml
+
+targets:
+  dev:
+    workspace:
+      host: ${var.databricks_host}
+    variables:
+      catalog_name: dev_catalog
+    mode: development
+    default: true
+
+  test:
+    workspace:
+      host: ${var.databricks_host}
+    variables:
+      catalog_name: test_catalog
+    mode: production
+
+  prod:
+    workspace:
+      host: ${var.databricks_host}
+    variables:
+      catalog_name: prod_catalog
+    mode: production

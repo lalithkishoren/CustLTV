@@ -1,0 +1,14 @@
+{
+    "name": "LS_AzureDatabricks",
+    "properties": {
+        "type": "AzureDatabricks",
+        "typeProperties": {
+            "domain": "https://{{PLACEHOLDER_DATABRICKS_WORKSPACE_URL}}",
+            "accessToken": {
+                "type": "SecureString",
+                "value": "{{PLACEHOLDER_DATABRICKS_TOKEN}}"
+            },
+            "existingClusterId": "{{PLACEHOLDER_CLUSTER_ID}}"
+        }
+    }
+}

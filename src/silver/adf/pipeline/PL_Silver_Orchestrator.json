@@ -1,0 +1,113 @@
+{
+    "name": "PL_Silver_Orchestrator",
+    "properties": {
+        "activities": [
+            {
+                "name": "Lookup_ActiveSilverTables",
+                "type": "Lookup",
+                "dependsOn": [],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "source": {
+                        "type": "AzureSqlSource",
+                        "sqlReaderQuery": "SELECT * FROM control.silver_table_config WHERE is_active = 1 ORDER BY load_priority ASC",
+                        "queryTimeout": "02:00:00",
+                        "partitionOption": "None"
+                    },
+                    "dataset": {
+                        "referenceName": "DS_ControlDB_Silver",
+                        "type": "DatasetReference"
+                    },
+                    "firstRowOnly": false
+                }
+            },
+            {
+                "name": "ForEach_SilverTable",
+                "type": "ForEach",
+                "dependsOn": [
+                    {
+                        "activity": "Lookup_ActiveSilverTables",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                    "items": {
+                        "value": "@activity('Lookup_ActiveSilverTables').output.value",
+                        "type": "Expression"
+                    },
+                    "isSequential": true,
+                    "activities": [
+                        {
+                            "name": "Execute_Silver_Transform",
+                            "type": "ExecutePipeline",
+                            "dependsOn": [],
+                            "userProperties": [],
+                            "typeProperties": {
+                                "pipeline": {
+                                    "referenceName": "PL_Silver_Transform_Single_Table",
+                                    "type": "PipelineReference"
+                                },
+                                "waitOnCompletion": true,
+                                "parameters": {
+                                    "pipeline_run_id": {
+                                        "value": "@pipeline().parameters.pipeline_run_id",
+                                        "type": "Expression"
+                                    },
+                                    "silver_table_id": {
+                                        "value": "@item().silver_table_id",
+                                        "type": "Expression"
+                                    },
+                                    "source_bronze_path": {
+                                        "value": "@item().source_bronze_path",
+                                        "type": "Expression"
+                                    },
+                                    "target_silver_path": {
+                                        "value": "@item().target_silver_path",
+                                        "type": "Expression"
+                                    },
+                                    "table_name": {
+                                        "value": "@item().table_name",
+                                        "type": "Expression"
+                                    },
+                                    "primary_key_columns": {
+                                        "value": "@item().primary_key_columns",
+                                        "type": "Expression"
+                                    },
+                                    "scd_type": {
+                                        "value": "@item().scd_type",
+                                        "type": "Expression"
+                                    },
+                                    "partition_columns": {
+                                        "value": "@item().partition_columns",
+                                        "type": "Expression"
+                                    },
+                                    "z_order_columns": {
+                                        "value": "@item().z_order_columns",
+                                        "type": "Expression"
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        ],
+        "parameters": {
+            "pipeline_run_id": {
+                "type": "string",
+                "defaultValue": "@pipeline().RunId"
+            }
+        },
+        "annotations": []
+    }
+}

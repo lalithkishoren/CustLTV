@@ -1,0 +1,274 @@
+{
+    "name": "PL_Silver_Transform_Single_Table",
+    "properties": {
+        "activities": [
+            {
+                "name": "Lookup_TransformationRules",
+                "type": "Lookup",
+                "dependsOn": [],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "source": {
+                        "type": "AzureSqlSource",
+                        "sqlReaderStoredProcedureName": "[control].[sp_GetSilverTransformationRules]",
+                        "storedProcedureParameters": {
+                            "SilverTableId": {
+                                "type": "Int32",
+                                "value": {
+                                    "value": "@pipeline().parameters.silver_table_id",
+                                    "type": "Expression"
+                                }
+                            }
+                        },
+                        "queryTimeout": "02:00:00",
+                        "partitionOption": "None"
+                    },
+                    "dataset": {
+                        "referenceName": "DS_ControlDB_Silver",
+                        "type": "DatasetReference"
+                    },
+                    "firstRowOnly": false
+                }
+            },
+            {
+                "name": "Notebook_SilverTransform",
+                "type": "DatabricksNotebook",
+                "dependsOn": [
+                    {
+                        "activity": "Lookup_TransformationRules",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 2,
+                    "retryIntervalInSeconds": 300,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "notebookPath": "/Shared/silver/Silver_Transform_Dynamic",
+                    "baseParameters": {
+                        "pipeline_run_id": {
+                            "value": "@pipeline().parameters.pipeline_run_id",
+                            "type": "Expression"
+                        },
+                        "silver_table_id": {
+                            "value": "@pipeline().parameters.silver_table_id",
+                            "type": "Expression"
+                        },
+                        "source_bronze_path": {
+                            "value": "@pipeline().parameters.source_bronze_path",
+                            "type": "Expression"
+                        },
+                        "target_silver_path": {
+                            "value": "@pipeline().parameters.target_silver_path",
+                            "type": "Expression"
+                        },
+                        "table_name": {
+                            "value": "@pipeline().parameters.table_name",
+                            "type": "Expression"
+                        },
+                        "primary_key_columns": {
+                            "value": "@pipeline().parameters.primary_key_columns",
+                            "type": "Expression"
+                        },
+                        "scd_type": {
+                            "value": "@pipeline().parameters.scd_type",
+                            "type": "Expression"
+                        },
+                        "partition_columns": {
+                            "value": "@pipeline().parameters.partition_columns",
+                            "type": "Expression"
+                        },
+                        "z_order_columns": {
+                            "value": "@pipeline().parameters.z_order_columns",
+                            "type": "Expression"
+                        },
+                        "transformation_rules_json": {
+                            "value": "@string(activity('Lookup_TransformationRules').output.value)",
+                            "type": "Expression"
+                        },
+                        "storage_account": {
+                            "value": "{{PLACEHOLDER_STORAGE_ACCOUNT}}",
+                            "type": "Expression"
+                        }
+                    }
+                },
+                "linkedServiceName": {
+                    "referenceName": "LS_AzureDatabricks",
+                    "type": "LinkedServiceReference"
+                }
+            },
+            {
+                "name": "SP_UpdateSilverStatus_Success",
+                "type": "SqlServerStoredProcedure",
+                "dependsOn": [
+                    {
+                        "activity": "Notebook_SilverTransform",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "storedProcedureName": "[control].[sp_UpdateSilverTableStatus]",
+                    "storedProcedureParameters": {
+                        "SilverTableId": {
+                            "value": {
+                                "value": "@pipeline().parameters.silver_table_id",
+                                "type": "Expression"
+                            },
+                            "type": "Int32"
+                        },
+                        "Status": {
+                            "value": "SUCCESS",
+                            "type": "String"
+                        },
+                        "PipelineRunId": {
+                            "value": {
+                                "value": "@pipeline().parameters.pipeline_run_id",
+                                "type": "Expression"
+                            },
+                            "type": "String"
+                        },
+                        "RecordsRead": {
+                            "value": {
+                                "value": "@activity('Notebook_SilverTransform').output.runOutput.records_read",
+                                "type": "Expression"
+                            },
+                            "type": "Int64"
+                        },
+                        "RecordsWritten": {
+                            "value": {
+                                "value": "@activity('Notebook_SilverTransform').output.runOutput.records_written",
+                                "type": "Expression"
+                            },
+                            "type": "Int64"
+                        },
+                        "RecordsFiltered": {
+                            "value": {
+                                "value": "@activity('Notebook_SilverTransform').output.runOutput.records_filtered",
+                                "type": "Expression"
+                            },
+                            "type": "Int64"
+                        },
+                        "RecordsQuarantined": {
+                            "value": {
+                                "value": "@activity('Notebook_SilverTransform').output.runOutput.records_quarantined",
+                                "type": "Expression"
+                            },
+                            "type": "Int64"
+                        }
+                    }
+                },
+                "linkedServiceName": {
+                    "referenceName": "LS_AzureSQL_Control",
+                    "type": "LinkedServiceReference"
+                }
+            },
+            {
+                "name": "SP_UpdateSilverStatus_Failure",
+                "type": "SqlServerStoredProcedure",
+                "dependsOn": [
+                    {
+                        "activity": "Notebook_SilverTransform",
+                        "dependencyConditions": [
+                            "Failed"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "storedProcedureName": "[control].[sp_UpdateSilverTableStatus]",
+                    "storedProcedureParameters": {
+                        "SilverTableId": {
+                            "value": {
+                                "value": "@pipeline().parameters.silver_table_id",
+                                "type": "Expression"
+                            },
+                            "type": "Int32"
+                        },
+                        "Status": {
+                            "value": "FAILED",
+                            "type": "String"
+                        },
+                        "PipelineRunId": {
+                            "value": {
+                                "value": "@pipeline().parameters.pipeline_run_id",
+                                "type": "Expression"
+                            },
+                            "type": "String"
+                        },
+                        "ErrorMessage": {
+                            "value": {
+                                "value": "@activity('Notebook_SilverTransform').error.message",
+                                "type": "Expression"
+                            },
+                            "type": "String"
+                        }
+                    }
+                },
+                "linkedServiceName": {
+                    "referenceName": "LS_AzureSQL_Control",
+                    "type": "LinkedServiceReference"
+                }
+            }
+        ],
+        "parameters": {
+            "pipeline_run_id": {
+                "type": "string"
+            },
+            "silver_table_id": {
+                "type": "int"
+            },
+            "source_bronze_path": {
+                "type": "string"
+            },
+            "target_silver_path": {
+                "type": "string"
+            },
+            "table_name": {
+                "type": "string"
+            },
+            "primary_key_columns": {
+                "type": "string"
+            },
+            "scd_type": {
+                "type": "int"
+            },
+            "partition_columns": {
+                "type": "string"
+            },
+            "z_order_columns": {
+                "type": "string"
+            }
+        },
+        "annotations": []
+    }
+}

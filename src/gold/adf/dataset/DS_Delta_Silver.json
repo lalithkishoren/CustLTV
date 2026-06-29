@@ -1,0 +1,26 @@
+{
+    "name": "DS_Delta_Silver",
+    "properties": {
+        "linkedServiceName": {
+            "referenceName": "LS_AzureDataLakeStorage",
+            "type": "LinkedServiceReference"
+        },
+        "parameters": {
+            "silver_path": {
+                "type": "string"
+            }
+        },
+        "type": "Delta",
+        "typeProperties": {
+            "location": {
+                "type": "AzureBlobFSLocation",
+                "folderPath": {
+                    "value": "@dataset().silver_path",
+                    "type": "Expression"
+                },
+                "fileSystem": "silver"
+            }
+        },
+        "annotations": []
+    }
+}

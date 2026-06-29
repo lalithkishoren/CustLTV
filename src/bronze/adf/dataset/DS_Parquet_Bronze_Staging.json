@@ -1,0 +1,38 @@
+{
+    "name": "DS_Parquet_Bronze_Staging",
+    "properties": {
+        "linkedServiceName": {
+            "referenceName": "LS_AzureDataLakeStorage",
+            "type": "LinkedServiceReference"
+        },
+        "parameters": {
+            "source_system": {
+                "type": "string"
+            },
+            "schema_name": {
+                "type": "string"
+            },
+            "table_name": {
+                "type": "string"
+            },
+            "load_type": {
+                "type": "string"
+            },
+            "pipeline_run_id": {
+                "type": "string"
+            }
+        },
+        "type": "Parquet",
+        "typeProperties": {
+            "location": {
+                "type": "AzureBlobFSLocation",
+                "folderPath": {
+                    "value": "staging/@{dataset().source_system}/@{dataset().schema_name}/@{dataset().table_name}/@{dataset().load_type}/@{dataset().pipeline_run_id}",
+                    "type": "Expression"
+                },
+                "fileSystem": "bronze"
+            },
+            "compressionCodec": "snappy"
+        }
+    }
+}

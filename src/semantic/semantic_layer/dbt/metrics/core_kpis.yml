@@ -1,0 +1,38 @@
+# dbt Semantic Layer (MetricFlow) - Core Business KPIs
+# These metrics serve as the single source of truth for AI (Databricks SQL / LLMs) and BI tools.
+metrics:
+  - name: average_order_value
+    label: "Average Order Value (AOV)"
+    description: "Measures the average revenue generated per unique order."
+    type: ratio
+    type_params:
+      numerator: total_amount
+      denominator: unique_orders
+    meta:
+      grain: "Customer/Monthly"
+      domain: "Sales"
+
+  - name: purchase_frequency
+    label: "Purchase Frequency"
+    description: "Measures the average number of purchases per 30-day period for a customer."
+    type: derived
+    type_params:
+      expr: "unique_orders / NULLIF((DATEDIFF(day, first_order_date, last_order_date) / 30.0), 0)"
+      metrics:
+        - name: unique_orders
+        - name: first_order_date
+        - name: last_order_date
+    meta:
+      grain: "Customer"
+      domain: "Customer Retention"
+
+  - name: customer_acquisition_cost
+    label: "Customer Acquisition Cost (CAC)"
+    description: "Measures the cost to acquire a new customer via marketing campaigns."
+    type: ratio
+    type_params:
+      numerator: total_spend
+      denominator: customers_acquired
+    meta:
+      grain: "Campaign/Monthly"
+      domain: "Marketing"
